@@ -1,0 +1,39 @@
+# Development environment configuration
+environment: development
+debug: true
+
+api:
+  reload: true
+  host: "0.0.0.0"
+  port: 8000
+
+monitoring:
+  log_level: "DEBUG"
+  health_check_interval: 15
+  enable_metrics: true
+
+kafka:
+  bootstrap_servers: "localhost:9092"
+  request_timeout_ms: 10000
+  connection_timeout_ms: 5000
+  default_partitions: 1
+  default_replication_factor: 1
+
+kafka_rest_proxy:
+  host: "localhost"
+  port: 8082
+  request_timeout: 30
+  max_retries: 3
+
+kafka_ui:
+  host: "localhost"
+  port: 8080
+  cluster_name: "local-dev"
+  dynamic_config_enabled: true
+
+docker:
+  compose_file: "docker-compose.yml"
+  project_name: "local-kafka-manager-dev"
+  network_name: "kafka-network-dev"
+  container_start_timeout: 120
+  container_stop_timeout: 30

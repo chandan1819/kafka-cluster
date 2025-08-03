@@ -1,0 +1,41 @@
+# Testing environment configuration
+environment: testing
+debug: false
+
+api:
+  reload: false
+  host: "127.0.0.1"
+  port: 8001
+
+monitoring:
+  log_level: "WARNING"
+  health_check_interval: 60
+  enable_metrics: false
+
+kafka:
+  bootstrap_servers: "localhost:9093"
+  request_timeout_ms: 5000
+  connection_timeout_ms: 2000
+  default_partitions: 1
+  default_replication_factor: 1
+
+kafka_rest_proxy:
+  host: "localhost"
+  port: 8083
+  base_url: "http://localhost:8083"
+  request_timeout: 10
+  max_retries: 1
+
+kafka_ui:
+  host: "localhost"
+  port: 8081
+  base_url: "http://localhost:8081"
+  cluster_name: "local-test"
+  dynamic_config_enabled: false
+
+docker:
+  compose_file: "docker-compose.test.yml"
+  project_name: "local-kafka-manager-test"
+  network_name: "kafka-network-test"
+  container_start_timeout: 60
+  container_stop_timeout: 15
