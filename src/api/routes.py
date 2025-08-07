@@ -44,6 +44,9 @@ topic_manager = TopicManager()
 message_manager = MessageManager()
 service_catalog = ServiceCatalog(cluster_manager, topic_manager)
 
+# Multi-cluster services (will be initialized in main.py)
+from ..middleware.backward_compatibility import get_backward_compatibility_manager
+
 # Create API router
 router = APIRouter()
 
@@ -89,10 +92,24 @@ async def get_service_catalog(
     
     Returns information about cluster status, available topics, API endpoints,
     and service health status.
+    
+    Note: This endpoint maintains backward compatibility by routing to the default cluster
+    in the multi-cluster system.
     """
     try:
-        catalog = await service_catalog.get_catalog(force_refresh=force_refresh)
-        return catalog
+        # Try to use multi-cluster system for backward compatibility
+        try:
+            compat_manager = get_backward_compatibility_manager()
+            legacy_catalog = await compat_manager.get_legacy_service_catalog(force_refresh=force_refresh)
+            
+            # Convert to CatalogResponse
+            return CatalogResponse(**legacy_catalog)
+            
+        except Exception:
+            # Fall back to original single-cluster implementation
+            logger.debug("Falling back to single-cluster implementation")
+            catalog = await service_catalog.get_catalog(force_refresh=force_refresh)
+            return catalog
     except Exception as e:
         raise handle_service_error(e, "get service catalog")
 
@@ -104,13 +121,38 @@ async def start_cluster(request: ClusterStartRequest = ClusterStartRequest()) ->
     Start the local Kafka cluster using Docker Compose.
     
     This will launch Kafka broker, REST Proxy, and UI services.
+    
+    Note: This endpoint maintains backward compatibility by routing to the default cluster
+    in the multi-cluster system.
     """
     try:
-        status = await cluster_manager.start_cluster(
-            force=request.force,
-            timeout=request.timeout
-        )
-        return status
+        # Try to use multi-cluster system for backward compatibility
+        try:
+            compat_manager = get_backward_compatibility_manager()
+            final_status = await compat_manager.route_legacy_cluster_operation(
+                "start",
+                force=request.force,
+                timeout=request.timeout
+            )
+            
+            # Convert ServiceStatus to ClusterStatus for backward compatibility
+            from ..models.cluster import ClusterStatus
+            return ClusterStatus(
+                status=final_status,
+                broker_count=1,  # Default for single cluster
+                version="7.4.0",
+                endpoints={},
+                services={}
+            )
+            
+        except Exception:
+            # Fall back to original single-cluster implementation
+            logger.debug("Falling back to single-cluster implementation")
+            status = await cluster_manager.start_cluster(
+                force=request.force,
+                timeout=request.timeout
+            )
+            return status
     except Exception as e:
         raise handle_service_error(e, "start cluster")
 
@@ -121,14 +163,31 @@ async def stop_cluster(request: ClusterStopRequest = ClusterStopRequest()) -> di
     Stop the local Kafka cluster.
     
     This will stop all running containers and optionally clean up resources.
+    
+    Note: This endpoint maintains backward compatibility by routing to the default cluster
+    in the multi-cluster system.
     """
     try:
-        success = await cluster_manager.stop_cluster(
-            force=request.force,
-            cleanup=request.cleanup,
-            timeout=request.timeout
-        )
-        return {"success": success, "message": "Cluster stopped successfully"}
+        # Try to use multi-cluster system for backward compatibility
+        try:
+            compat_manager = get_backward_compatibility_manager()
+            success = await compat_manager.route_legacy_cluster_operation(
+                "stop",
+                force=request.force,
+                cleanup=request.cleanup,
+                timeout=request.timeout
+            )
+            return {"success": success, "message": "Cluster stopped successfully"}
+            
+        except Exception:
+            # Fall back to original single-cluster implementation
+            logger.debug("Falling back to single-cluster implementation")
+            success = await cluster_manager.stop_cluster(
+                force=request.force,
+                cleanup=request.cleanup,
+                timeout=request.timeout
+            )
+            return {"success": success, "message": "Cluster stopped successfully"}
     except Exception as e:
         raise handle_service_error(e, "stop cluster")
 
@@ -140,10 +199,31 @@ async def get_cluster_status() -> ClusterStatus:
     
     Returns detailed information about cluster state, broker count, service health,
     and available endpoints.
+    
+    Note: This endpoint maintains backward compatibility by routing to the default cluster
+    in the multi-cluster system.
     """
     try:
-        status = await cluster_manager.get_status()
-        return status
+        # Try to use multi-cluster system for backward compatibility
+        try:
+            compat_manager = get_backward_compatibility_manager()
+            service_status = await compat_manager.route_legacy_cluster_operation("status")
+            
+            # Convert ServiceStatus to ClusterStatus for backward compatibility
+            from ..models.cluster import ClusterStatus
+            return ClusterStatus(
+                status=service_status,
+                broker_count=1,  # Default for single cluster
+                version="7.4.0",
+                endpoints={},
+                services={}
+            )
+            
+        except Exception:
+            # Fall back to original single-cluster implementation
+            logger.debug("Falling back to single-cluster implementation")
+            status = await cluster_manager.get_status()
+            return status
     except Exception as e:
         raise handle_service_error(e, "get cluster status")
 
@@ -157,13 +237,34 @@ async def list_topics(
     List all Kafka topics with their configuration and metadata.
     
     By default, internal topics are excluded from the results.
+    
+    Note: This endpoint maintains backward compatibility by routing to the default cluster
+    in the multi-cluster system.
     """
     try:
-        topics = await topic_manager.list_topics(include_internal=include_internal)
-        return TopicListResponse(
-            topics=topics,
-            total_count=len(topics)
-        )
+        # Try to use multi-cluster system for backward compatibility
+        try:
+            compat_manager = get_backward_compatibility_manager()
+            managers = await compat_manager.get_default_cluster_manager()
+            cluster_topic_manager = managers["topic_manager"]
+            
+            try:
+                topics = await cluster_topic_manager.list_topics(include_internal=include_internal)
+                return TopicListResponse(
+                    topics=topics,
+                    total_count=len(topics)
+                )
+            finally:
+                cluster_topic_manager.close()
+                
+        except Exception:
+            # Fall back to original single-cluster implementation
+            logger.debug("Falling back to single-cluster implementation")
+            topics = await topic_manager.list_topics(include_internal=include_internal)
+            return TopicListResponse(
+                topics=topics,
+                total_count=len(topics)
+            )
     except Exception as e:
         raise handle_service_error(e, "list topics")
 
@@ -175,14 +276,36 @@ async def create_topic(request: TopicCreateRequest) -> dict:
     
     The topic will be created with the provided number of partitions,
     replication factor, and configuration properties.
+    
+    Note: This endpoint maintains backward compatibility by routing to the default cluster
+    in the multi-cluster system.
     """
     try:
-        success = await topic_manager.create_topic(request)
-        return {
-            "success": success,
-            "message": f"Topic '{request.name}' created successfully",
-            "topic": request.name
-        }
+        # Try to use multi-cluster system for backward compatibility
+        try:
+            compat_manager = get_backward_compatibility_manager()
+            managers = await compat_manager.get_default_cluster_manager()
+            cluster_topic_manager = managers["topic_manager"]
+            
+            try:
+                success = await cluster_topic_manager.create_topic(request.to_topic_config())
+                return {
+                    "success": success,
+                    "message": f"Topic '{request.name}' created successfully",
+                    "topic": request.name
+                }
+            finally:
+                cluster_topic_manager.close()
+                
+        except Exception:
+            # Fall back to original single-cluster implementation
+            logger.debug("Falling back to single-cluster implementation")
+            success = await topic_manager.create_topic(request)
+            return {
+                "success": success,
+                "message": f"Topic '{request.name}' created successfully",
+                "topic": request.name
+            }
     except Exception as e:
         raise handle_service_error(e, "create topic")
 
@@ -375,6 +498,27 @@ async def service_health_check(
             "status": "unknown",
             "error": str(e),
             "last_check": datetime.utcnow().isoformat()
+        }
+
+
+@router.get("/compatibility/status", tags=["Compatibility"])
+async def get_backward_compatibility_status() -> dict:
+    """
+    Get backward compatibility status information.
+    
+    Returns information about the default cluster, legacy endpoint support,
+    and overall backward compatibility health.
+    """
+    try:
+        compat_manager = get_backward_compatibility_manager()
+        status = await compat_manager.get_compatibility_status()
+        return status
+    except Exception as e:
+        logger.error(f"Failed to get compatibility status: {e}")
+        return {
+            "backward_compatibility_enabled": False,
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
         }
 
 

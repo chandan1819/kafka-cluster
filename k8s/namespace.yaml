@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: multi-cluster-kafka
+  labels:
+    name: multi-cluster-kafka
+    app.kubernetes.io/name: multi-cluster-kafka-manager
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: namespace

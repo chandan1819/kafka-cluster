@@ -1,0 +1,52 @@
+# Backup service for multi-cluster Kafka manager
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    postgresql-client \
+    awscli \
+    cron \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create backup user
+RUN groupadd -r backup && useradd -r -g backup backup
+
+# Set working directory
+WORKDIR /app
+
+# Copy backup requirements
+COPY requirements-backup.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements-backup.txt
+
+# Copy backup scripts
+COPY scripts/backup/ ./scripts/
+COPY src/backup/ ./src/backup/
+
+# Make scripts executable
+RUN chmod +x ./scripts/*.sh
+
+# Create directories
+RUN mkdir -p /app/backups /app/logs && \
+    chown -R backup:backup /app
+
+# Copy crontab
+COPY scripts/backup/crontab /etc/cron.d/backup-cron
+RUN chmod 0644 /etc/cron.d/backup-cron && \
+    crontab -u backup /etc/cron.d/backup-cron
+
+# Switch to backup user
+USER backup
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8001/health || exit 1
+
+# Start cron and backup service
+CMD ["./scripts/start-backup-service.sh"]

@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: multi-cluster-config
+  namespace: multi-cluster-kafka
+  labels:
+    app.kubernetes.io/name: multi-cluster-kafka-manager
+    app.kubernetes.io/component: config
+data:
+  # Application configuration
+  LOG_LEVEL: "INFO"
+  ENVIRONMENT: "production"
+  ENABLE_MONITORING: "true"
+  ENABLE_SECURITY: "true"
+  HEALTH_CHECK_INTERVAL: "30"
+  MAX_CLUSTERS: "100"
+  PORT_RANGE_START: "19092"
+  PORT_RANGE_END: "20092"
+  BACKUP_ENABLED: "true"
+  BACKUP_SCHEDULE: "0 2 * * *"
+  
+  # Database configuration
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "multi_cluster_db"
+  DB_USER: "kafka_user"
+  
+  # Redis configuration
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  
+  # Monitoring configuration
+  PROMETHEUS_HOST: "prometheus-service"
+  PROMETHEUS_PORT: "9090"
+  
+  # Production settings
+  production.yml: |
+    server:
+      host: "0.0.0.0"
+      port: 8000
+      workers: 4
+      max_requests: 1000
+      timeout: 30
+      keepalive: 2
+    
+    database:
+      url: "postgresql://kafka_user:${POSTGRES_PASSWORD}@postgres-service:5432/multi_cluster_db"
+      pool_size: 20
+      max_overflow: 30
+      pool_timeout: 30
+      pool_recycle: 3600
+    
+    redis:
+      url: "redis://redis-service:6379/0"
+      max_connections: 50
+      retry_on_timeout: true
+    
+    logging:
+      level: INFO
+      format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+      handlers:
+        - type: file
+          filename: /app/logs/multi-cluster.log
+          max_bytes: 100000000
+          backup_count: 5
+        - type: console
+    
+    security:
+      secret_key: "${SECRET_KEY}"
+      jwt_expiration: 3600
+      password_hash_rounds: 12
+      api_rate_limit: 1000
+    
+    monitoring:
+      enabled: true
+      metrics_port: 8001
+      health_check_interval: 30
+      prometheus_metrics: true
+    
+    clusters:
+      max_clusters: 100
+      default_template: "production"
+      port_range:
+        start: 19092
+        end: 20092
+      data_directory: "/app/data/clusters"
+      backup_directory: "/app/backups"
+    
+    backup:
+      enabled: true
+      schedule: "0 2 * * *"
+      retention_days: 30
+      compression: true
+      encryption: true

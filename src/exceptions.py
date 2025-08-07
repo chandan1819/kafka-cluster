@@ -6,7 +6,7 @@ error handling throughout the application.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from enum import Enum
 
 
@@ -403,4 +403,214 @@ class TimeoutError(LocalKafkaManagerError):
             error_code=ErrorCode.TIMEOUT,
             details={"operation": operation, "timeout_seconds": timeout_seconds},
             cause=cause
+        )
+
+
+# Multi-Cluster Specific Exceptions
+
+class MultiClusterError(LocalKafkaManagerError):
+    """Base exception for multi-cluster operations."""
+    pass
+
+
+class ClusterNotFoundError(MultiClusterError):
+    """Raised when cluster ID is not found."""
+    
+    def __init__(self, cluster_id: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=f"Cluster '{cluster_id}' not found",
+            error_code=ErrorCode.NOT_FOUND,
+            details={"cluster_id": cluster_id, **(details or {})}
+        )
+        self.cluster_id = cluster_id
+
+
+class ClusterAlreadyExistsError(MultiClusterError):
+    """Raised when trying to create a cluster with existing ID."""
+    
+    def __init__(self, cluster_id: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=f"Cluster '{cluster_id}' already exists",
+            error_code=ErrorCode.CONFLICT,
+            details={"cluster_id": cluster_id, **(details or {})}
+        )
+        self.cluster_id = cluster_id
+
+
+class PortAllocationError(MultiClusterError):
+    """Raised when unable to allocate required ports."""
+    
+    def __init__(self, message: str, requested_ports: Optional[List[int]] = None, 
+                 conflicting_ports: Optional[List[int]] = None, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            error_code=ErrorCode.CONFLICT,
+            details={
+                "requested_ports": requested_ports or [],
+                "conflicting_ports": conflicting_ports or [],
+                **(details or {})
+            }
+        )
+        self.requested_ports = requested_ports or []
+        self.conflicting_ports = conflicting_ports or []
+
+
+class CrossClusterOperationError(MultiClusterError):
+    """Raised when cross-cluster operations fail."""
+    
+    def __init__(self, message: str, operation_id: Optional[str] = None, 
+                 operation_type: Optional[str] = None, details: Optional[Dict[str, Any]] = None, 
+                 cause: Optional[Exception] = None):
+        super().__init__(
+            message=message,
+            error_code=ErrorCode.INTERNAL_SERVER_ERROR,
+            details={
+                "operation_id": operation_id,
+                "operation_type": operation_type,
+                **(details or {})
+            },
+            cause=cause
+        )
+        self.operation_id = operation_id
+        self.operation_type = operation_type
+
+
+class TemplateNotFoundError(MultiClusterError):
+    """Raised when template is not found."""
+    
+    def __init__(self, template_id: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=f"Template '{template_id}' not found",
+            error_code=ErrorCode.NOT_FOUND,
+            details={"template_id": template_id, **(details or {})}
+        )
+        self.template_id = template_id
+
+
+class TemplateAlreadyExistsError(MultiClusterError):
+    """Raised when trying to create a template with existing ID."""
+    
+    def __init__(self, template_id: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=f"Template '{template_id}' already exists",
+            error_code=ErrorCode.CONFLICT,
+            details={"template_id": template_id, **(details or {})}
+        )
+        self.template_id = template_id
+
+
+class ClusterOperationError(MultiClusterError):
+    """Raised when cluster operations fail."""
+    
+    def __init__(self, cluster_id: str, operation: str, message: str, 
+                 details: Optional[Dict[str, Any]] = None, cause: Optional[Exception] = None):
+        super().__init__(
+            message=f"Cluster '{cluster_id}' {operation} operation failed: {message}",
+            error_code=ErrorCode.INTERNAL_SERVER_ERROR,
+            details={
+                "cluster_id": cluster_id,
+                "operation": operation,
+                **(details or {})
+            },
+            cause=cause
+        )
+        self.cluster_id = cluster_id
+        self.operation = operation
+
+
+class ClusterValidationError(MultiClusterError):
+    """Raised when cluster configuration validation fails."""
+    
+    def __init__(self, cluster_id: str, validation_errors: List[str], 
+                 details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=f"Cluster '{cluster_id}' validation failed: {'; '.join(validation_errors)}",
+            error_code=ErrorCode.VALIDATION_ERROR,
+            details={
+                "cluster_id": cluster_id,
+                "validation_errors": validation_errors,
+                **(details or {})
+            }
+        )
+        self.cluster_id = cluster_id
+        self.validation_errors = validation_errors
+
+
+class ClusterConflictError(MultiClusterError):
+    """Raised when cluster conflicts with existing clusters."""
+    
+    def __init__(self, cluster_id: str, conflicts: List[str], 
+                 details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=f"Cluster '{cluster_id}' conflicts with existing clusters: {'; '.join(conflicts)}",
+            error_code=ErrorCode.CONFLICT,
+            details={
+                "cluster_id": cluster_id,
+                "conflicts": conflicts,
+                **(details or {})
+            }
+        )
+        self.cluster_id = cluster_id
+        self.conflicts = conflicts
+
+
+class NetworkIsolationError(MultiClusterError):
+    """Raised when network isolation setup fails."""
+    
+    def __init__(self, message: str, cluster_id: Optional[str] = None, 
+                 network_name: Optional[str] = None, details: Optional[Dict[str, Any]] = None, 
+                 cause: Optional[Exception] = None):
+        super().__init__(
+            message=message,
+            error_code=ErrorCode.INTERNAL_SERVER_ERROR,
+            details={
+                "cluster_id": cluster_id,
+                "network_name": network_name,
+                **(details or {})
+            },
+            cause=cause
+        )
+        self.cluster_id = cluster_id
+        self.network_name = network_name
+
+
+class StorageBackendError(MultiClusterError):
+    """Raised when storage backend operations fail."""
+    
+    def __init__(self, message: str, backend_type: Optional[str] = None, 
+                 operation: Optional[str] = None, details: Optional[Dict[str, Any]] = None, 
+                 cause: Optional[Exception] = None):
+        super().__init__(
+            message=message,
+            error_code=ErrorCode.INTERNAL_SERVER_ERROR,
+            details={
+                "backend_type": backend_type,
+                "operation": operation,
+                **(details or {})
+            },
+            cause=cause
+        )
+        self.backend_type = backend_type
+        self.operation = operation
+
+
+class ConfigurationError(LocalKafkaManagerError):
+    """Raised when configuration operations fail."""
+    
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            error_code=ErrorCode.VALIDATION_ERROR,
+            details=details or {}
+        )
+
+
+class SecurityError(LocalKafkaManagerError):
+    """Raised when security operations fail."""
+    
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            error_code=ErrorCode.VALIDATION_ERROR,
+            details=details or {}
         )

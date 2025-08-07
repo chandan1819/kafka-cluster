@@ -3,6 +3,7 @@ Local Kafka Manager - Main FastAPI application entry point
 """
 
 import logging
+import os
 import uuid
 from datetime import datetime
 from fastapi import FastAPI, Request
@@ -93,14 +94,89 @@ app.add_middleware(
     allow_headers=settings.api.cors_headers,
 )
 
+# Initialize multi-cluster services and backward compatibility
+from .services.multi_cluster_manager import MultiClusterManager
+from .services.multi_cluster_service_catalog import MultiClusterServiceCatalog
+from .services.template_manager import TemplateManager
+from .services.cross_cluster_operations import CrossClusterOperations
+from .registry.cluster_registry import ClusterRegistry
+from .storage.file_backend import FileStorageBackend
+from .middleware.backward_compatibility import (
+    ensure_backward_compatibility,
+    create_legacy_api_middleware
+)
+
+# Initialize storage backend
+storage_backend = FileStorageBackend()
+
+# Initialize multi-cluster services
+cluster_registry = ClusterRegistry(storage_backend)
+template_manager_instance = TemplateManager(storage_backend)
+cluster_factory = None  # Will be initialized later if needed
+multi_cluster_manager_instance = MultiClusterManager(cluster_registry, cluster_factory, template_manager_instance)
+multi_cluster_catalog = MultiClusterServiceCatalog(multi_cluster_manager_instance)
+cross_cluster_ops = CrossClusterOperations(multi_cluster_manager_instance)
+
+# Global backward compatibility manager (will be initialized in startup)
+backward_compatibility_manager = None
+
 # Include API routes
 app.include_router(router)
+
+# Include multi-cluster routes
+from .api.multi_cluster_routes import router as multi_cluster_router, init_multi_cluster_services
+init_multi_cluster_services(
+    multi_cluster_manager_instance,
+    multi_cluster_catalog,
+    template_manager_instance,
+    cross_cluster_ops
+)
+app.include_router(multi_cluster_router)
+
+# Include web interface routes
+from .api.web_interface_routes import router as web_interface_router, init_web_interface_services
+init_web_interface_services(
+    multi_cluster_manager_instance,
+    multi_cluster_catalog,
+    template_manager_instance,
+    cross_cluster_ops
+)
+app.include_router(web_interface_router)
+
+# Include configuration management routes
+from .api.configuration_routes import router as config_router, init_configuration_services
+init_configuration_services(storage_backend)
+app.include_router(config_router)
+
+# Initialize security and access control
+from .security.access_control import AccessControlManager
+from .security.auth_middleware import init_auth_middleware, AuthenticationMiddleware
+from .api.auth_routes import router as auth_router
+
+# Initialize access control manager
+secret_key = os.getenv("SECRET_KEY", "default-secret-key-change-in-production")
+access_control_manager_instance = AccessControlManager(
+    secret_key=secret_key,
+    token_expiry_hours=24
+)
+
+# Initialize authentication middleware
+init_auth_middleware(access_control_manager_instance)
+auth_middleware = AuthenticationMiddleware(access_control_manager_instance)
+
+# Add authentication middleware (before other middleware)
+app.add_middleware(type(auth_middleware), access_manager=access_control_manager_instance)
+
+# Include authentication routes
+app.include_router(auth_router)
 
 
 # Application lifecycle events
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on application startup."""
+    global backward_compatibility_manager
+    
     logger.info(
         "Starting Local Kafka Manager application",
         extra={
@@ -113,6 +189,29 @@ async def startup_event():
     # Record startup metrics
     counter('application.startup', 1)
     gauge('application.config.debug', 1 if settings.debug else 0)
+    
+    # Initialize backward compatibility
+    try:
+        from .middleware.backward_compatibility import set_global_compatibility_manager
+        
+        backward_compatibility_manager = await ensure_backward_compatibility(
+            multi_cluster_manager_instance,
+            cluster_registry,
+            template_manager_instance
+        )
+        
+        # Set global instance for access from routes
+        set_global_compatibility_manager(backward_compatibility_manager)
+        
+        # Add backward compatibility middleware
+        legacy_middleware = create_legacy_api_middleware(backward_compatibility_manager)
+        app.add_middleware(type(legacy_middleware), compatibility_manager=backward_compatibility_manager)
+        
+        logger.info("Backward compatibility initialized successfully")
+        counter('backward_compatibility.initialized', 1)
+    except Exception as e:
+        logger.error(f"Failed to initialize backward compatibility: {e}", exc_info=True)
+        counter('backward_compatibility.init_errors', 1)
     
     # Start health monitoring
     try:

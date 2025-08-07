@@ -34,15 +34,18 @@ class TopicManager:
     """Manages Kafka topic lifecycle operations using Kafka Admin API."""
     
     def __init__(self, bootstrap_servers: Optional[str] = None, 
-                 request_timeout_ms: Optional[int] = None):
+                 request_timeout_ms: Optional[int] = None,
+                 cluster_id: Optional[str] = None):
         """Initialize the topic manager.
         
         Args:
             bootstrap_servers: Kafka bootstrap servers (uses config if None)
             request_timeout_ms: Request timeout in milliseconds (uses config if None)
+            cluster_id: Cluster ID for multi-cluster operations (uses default if None)
         """
         from ..config import settings
         
+        self.cluster_id = cluster_id or "default"
         self.bootstrap_servers = bootstrap_servers or settings.kafka.bootstrap_servers
         self.request_timeout_ms = request_timeout_ms or settings.kafka.request_timeout_ms
         self._admin_client: Optional[KafkaAdminClient] = None
@@ -89,7 +92,7 @@ class TopicManager:
             TopicManagerError: If listing topics fails
             KafkaNotAvailableError: If Kafka is not available
         """
-        logger.debug("Listing Kafka topics...")
+        logger.debug(f"Listing Kafka topics for cluster: {self.cluster_id}")
         
         try:
             admin_client = self.admin_client
@@ -136,10 +139,10 @@ class TopicManager:
         except KafkaNotAvailableError:
             raise
         except Exception as e:
-            logger.error(f"Failed to list topics: {e}")
+            logger.error(f"Failed to list topics for cluster {self.cluster_id}: {e}")
             raise TopicManagerError(
-                message=f"Failed to list topics: {e}",
-                details={"include_internal": include_internal},
+                message=f"Failed to list topics for cluster {self.cluster_id}: {e}",
+                details={"include_internal": include_internal, "cluster_id": self.cluster_id},
                 cause=e
             )
 
@@ -156,7 +159,7 @@ class TopicManager:
             TopicManagerError: If topic creation fails
             KafkaNotAvailableError: If Kafka is not available
         """
-        logger.info(f"Creating topic: {topic_config.name}")
+        logger.info(f"Creating topic: {topic_config.name} in cluster: {self.cluster_id}")
         
         try:
             admin_client = self.admin_client
@@ -192,10 +195,10 @@ class TopicManager:
         except (TopicManagerError, KafkaNotAvailableError):
             raise
         except Exception as e:
-            logger.error(f"Failed to create topic {topic_config.name}: {e}")
+            logger.error(f"Failed to create topic {topic_config.name} in cluster {self.cluster_id}: {e}")
             raise TopicCreationError(
                 topic_name=topic_config.name,
-                reason=str(e),
+                reason=f"Cluster {self.cluster_id}: {str(e)}",
                 cause=e
             )
 

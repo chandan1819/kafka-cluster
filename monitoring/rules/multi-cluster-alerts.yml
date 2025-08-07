@@ -1,0 +1,239 @@
+# Alerting rules for multi-cluster Kafka manager
+groups:
+  - name: multi-cluster-manager
+    rules:
+      # Application health alerts
+      - alert: MultiClusterManagerDown
+        expr: up{job="multi-cluster-manager"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: multi-cluster-manager
+        annotations:
+          summary: "Multi-cluster manager is down"
+          description: "Multi-cluster manager has been down for more than 1 minute"
+          runbook_url: "https://docs.example.com/runbooks/multi-cluster-manager-down"
+
+      - alert: MultiClusterManagerHighErrorRate
+        expr: rate(http_requests_total{job="multi-cluster-manager",status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: multi-cluster-manager
+        annotations:
+          summary: "High error rate in multi-cluster manager"
+          description: "Error rate is {{ $value }} errors per second"
+
+      - alert: MultiClusterManagerHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="multi-cluster-manager"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: multi-cluster-manager
+        annotations:
+          summary: "High latency in multi-cluster manager"
+          description: "95th percentile latency is {{ $value }}s"
+
+      # Cluster management alerts
+      - alert: TooManyClusters
+        expr: multi_cluster_total_clusters > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: multi-cluster-manager
+        annotations:
+          summary: "Approaching cluster limit"
+          description: "Currently managing {{ $value }} clusters (limit: 100)"
+
+      - alert: ClusterCreationFailures
+        expr: rate(multi_cluster_operations_total{operation="create",status="failed"}[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: multi-cluster-manager
+        annotations:
+          summary: "High cluster creation failure rate"
+          description: "Cluster creation failure rate is {{ $value }} per second"
+
+      - alert: UnhealthyClusters
+        expr: multi_cluster_unhealthy_clusters > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: multi-cluster-manager
+        annotations:
+          summary: "Multiple unhealthy clusters detected"
+          description: "{{ $value }} clusters are currently unhealthy"
+
+      # Resource alerts
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes{job="multi-cluster-manager"} / 1024 / 1024 / 1024) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: multi-cluster-manager
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}GB"
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total{job="multi-cluster-manager"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: multi-cluster-manager
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+
+      - alert: DiskSpaceLow
+        expr: (multi_cluster_disk_free_bytes / multi_cluster_disk_total_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          service: multi-cluster-manager
+        annotations:
+          summary: "Low disk space"
+          description: "Only {{ $value }}% disk space remaining"
+
+  - name: database
+    rules:
+      # PostgreSQL alerts
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute"
+
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: "High PostgreSQL connections"
+          description: "PostgreSQL connection usage is {{ $value }}%"
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_database_tup_returned[5m]) / rate(pg_stat_database_tup_fetched[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Query efficiency is {{ $value }}%"
+
+  - name: redis
+    rules:
+      # Redis alerts
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache has been down for more than 1 minute"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "High Redis memory usage"
+          description: "Redis memory usage is {{ $value }}%"
+
+      - alert: RedisHighConnections
+        expr: redis_connected_clients > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "High Redis connections"
+          description: "Redis has {{ $value }} connected clients"
+
+  - name: kafka-clusters
+    rules:
+      # Kafka cluster alerts
+      - alert: KafkaClusterDown
+        expr: up{job="kafka-clusters"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: kafka
+        annotations:
+          summary: "Kafka cluster is down"
+          description: "Kafka cluster {{ $labels.cluster_id }} has been down for more than 2 minutes"
+
+      - alert: KafkaHighProducerLatency
+        expr: kafka_producer_request_latency_avg > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "High Kafka producer latency"
+          description: "Producer latency is {{ $value }}ms for cluster {{ $labels.cluster_id }}"
+
+      - alert: KafkaHighConsumerLag
+        expr: kafka_consumer_lag_max > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "High Kafka consumer lag"
+          description: "Consumer lag is {{ $value }} messages for cluster {{ $labels.cluster_id }}"
+
+      - alert: KafkaDiskSpaceLow
+        expr: kafka_log_size_bytes / kafka_log_max_size_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "Kafka disk space low"
+          description: "Kafka disk usage is {{ $value }}% for cluster {{ $labels.cluster_id }}"
+
+  - name: system
+    rules:
+      # System-level alerts
+      - alert: HighSystemLoad
+        expr: node_load1 > 4
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High system load"
+          description: "System load is {{ $value }}"
+
+      - alert: SystemDiskSpaceLow
+        expr: (node_filesystem_free_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "System disk space low"
+          description: "Only {{ $value }}% disk space remaining on {{ $labels.mountpoint }}"
+
+      - alert: SystemMemoryLow
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "System memory low"
+          description: "Only {{ $value }}% memory available"

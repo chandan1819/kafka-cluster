@@ -1,934 +1,685 @@
-# 📚 Examples
+# Multi-Cluster Kafka Manager Examples
 
-This directory contains practical examples and use cases for Local Kafka Manager.
+This directory contains comprehensive examples and usage patterns for the Multi-Cluster Kafka Manager system.
 
-## 📁 Directory Structure
+## Overview
 
-```
-examples/
-├── README.md                    # This file
-├── basic/                       # Basic usage examples
-│   ├── producer_consumer.py     # Simple producer/consumer
-│   ├── topic_management.py      # Topic operations
-│   └── batch_operations.py      # Batch message handling
-├── advanced/                    # Advanced patterns
-│   ├── event_sourcing.py        # Event sourcing pattern
-│   ├── saga_pattern.py          # Distributed transactions
-│   └── stream_processing.py     # Real-time processing
-├── integrations/                # Integration examples
-│   ├── fastapi_integration.py   # FastAPI + Kafka
-│   ├── flask_integration.py     # Flask + Kafka
-│   └── django_integration.py    # Django + Kafka
-├── testing/                     # Testing examples
-│   ├── unit_tests.py           # Unit testing with Kafka
-│   ├── integration_tests.py    # Integration testing
-│   └── performance_tests.py    # Performance testing
-└── scripts/                     # Utility scripts
-    ├── data_generator.py        # Generate test data
-    ├── load_tester.py          # Load testing
-    └── monitoring.py           # Custom monitoring
+The examples are organized into several categories:
+
+1. **Complete Examples** (`complete_examples.py`) - Full-featured Python examples
+2. **API Examples** (`api_examples.py`) - REST API usage examples
+3. **Configuration Examples** - YAML and JSON configuration files
+4. **Integration Examples** - End-to-end integration scenarios
+
+## Quick Start
+
+### Running Complete Examples
+
+```bash
+# Run all examples
+python examples/complete_examples.py
+
+# Run specific example interactively
+python examples/complete_examples.py
+# Then choose from the menu
 ```
 
-## 🚀 Quick Start Examples
+### Running API Examples
 
-### 1. Basic Producer/Consumer
+```bash
+# Run all API examples
+python examples/api_examples.py
+
+# Run specific API example
+python examples/api_examples.py --example 1
+
+# Use custom API endpoint and authentication
+python examples/api_examples.py --base-url http://your-server:8000 --api-key your-api-key
+```
+
+## Complete Examples (`complete_examples.py`)
+
+### Example 1: Development Environment Setup
+- Creates multiple clusters for different services
+- Configures development-specific settings
+- Demonstrates basic cluster lifecycle management
+
 ```python
-# examples/basic/producer_consumer.py
-import requests
-import json
-import time
-
-# Configuration
-API_BASE = "http://localhost:8000"
-TOPIC_NAME = "user-events"
-
-# Create topic
-def create_topic():
-    response = requests.post(f"{API_BASE}/topics", json={
-        "name": TOPIC_NAME,
-        "partitions": 3,
-        "replication_factor": 1
-    })
-    print(f"Topic created: {response.json()}")
-
-# Produce messages
-def produce_messages():
-    for i in range(10):
-        message = {
-            "topic": TOPIC_NAME,
-            "key": f"user_{i}",
-            "value": {
-                "user_id": f"user_{i}",
-                "action": "login",
-                "timestamp": int(time.time()),
-                "metadata": {"source": "web", "version": "1.0"}
-            }
-        }
-        response = requests.post(f"{API_BASE}/produce", json=message)
-        print(f"Produced: {response.json()}")
-        time.sleep(0.1)
-
-# Consume messages
-def consume_messages():
-    params = {
-        "topic": TOPIC_NAME,
-        "consumer_group": "example-group",
-        "max_messages": 10
-    }
-    response = requests.get(f"{API_BASE}/consume", params=params)
-    messages = response.json()
-    print(f"Consumed {len(messages.get('messages', []))} messages:")
-    for msg in messages.get('messages', []):
-        print(f"  Key: {msg['key']}, Value: {msg['value']}")
-
-if __name__ == "__main__":
-    create_topic()
-    time.sleep(2)  # Wait for topic creation
-    produce_messages()
-    time.sleep(1)  # Wait for messages to be available
-    consume_messages()
+# Creates clusters for:
+# - user-service-dev (port 9092)
+# - order-service-dev (port 9093)
+# - notification-service-dev (port 9094)
+# - payment-service-dev (port 9095)
 ```
 
-### 2. Topic Management
+### Example 2: Production Deployment with Monitoring
+- Production cluster with security and monitoring
+- Automated backup scheduling
+- User management and permissions
+- Alert handling setup
+
 ```python
-# examples/basic/topic_management.py
-import requests
-import json
-
-API_BASE = "http://localhost:8000"
-
-class TopicManager:
-    def __init__(self, api_base=API_BASE):
-        self.api_base = api_base
-    
-    def list_topics(self):
-        """List all topics"""
-        response = requests.get(f"{self.api_base}/topics")
-        return response.json()
-    
-    def create_topic(self, name, partitions=3, replication_factor=1, config=None):
-        """Create a new topic"""
-        payload = {
-            "name": name,
-            "partitions": partitions,
-            "replication_factor": replication_factor
-        }
-        if config:
-            payload["config"] = config
-        
-        response = requests.post(f"{self.api_base}/topics", json=payload)
-        return response.json()
-    
-    def get_topic_details(self, topic_name):
-        """Get detailed information about a topic"""
-        response = requests.get(f"{self.api_base}/topics/{topic_name}")
-        return response.json()
-    
-    def delete_topic(self, topic_name):
-        """Delete a topic"""
-        response = requests.delete(f"{self.api_base}/topics/{topic_name}")
-        return response.json()
-    
-    def create_topics_from_config(self, config_file):
-        """Create multiple topics from configuration file"""
-        with open(config_file, 'r') as f:
-            topics_config = json.load(f)
-        
-        results = []
-        for topic_config in topics_config['topics']:
-            result = self.create_topic(**topic_config)
-            results.append(result)
-        
-        return results
-
-# Example usage
-if __name__ == "__main__":
-    tm = TopicManager()
-    
-    # Create topics for different use cases
-    topics = [
-        {"name": "user-events", "partitions": 3},
-        {"name": "order-events", "partitions": 6},
-        {"name": "inventory-updates", "partitions": 2},
-        {"name": "notifications", "partitions": 1}
-    ]
-    
-    for topic in topics:
-        result = tm.create_topic(**topic)
-        print(f"Created topic: {result}")
-    
-    # List all topics
-    all_topics = tm.list_topics()
-    print(f"All topics: {all_topics}")
-    
-    # Get details for a specific topic
-    details = tm.get_topic_details("user-events")
-    print(f"Topic details: {details}")
+# Features demonstrated:
+# - Production-grade configuration
+# - Daily backup schedules
+# - Role-based access control
+# - Custom alert handlers
+# - API key management
 ```
 
-### 3. Batch Operations
+### Example 3: Disaster Recovery Setup
+- Cross-cluster replication
+- DR cluster configuration
+- Automated DR testing
+- Baseline snapshots
+
 ```python
-# examples/basic/batch_operations.py
-import requests
-import json
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-API_BASE = "http://localhost:8000"
-
-class BatchOperations:
-    def __init__(self, api_base=API_BASE):
-        self.api_base = api_base
-    
-    def batch_produce(self, topic, messages):
-        """Produce multiple messages in a batch"""
-        payload = {
-            "topic": topic,
-            "messages": messages
-        }
-        response = requests.post(f"{self.api_base}/produce/batch", json=payload)
-        return response.json()
-    
-    def parallel_produce(self, topic, messages, batch_size=10, max_workers=5):
-        """Produce messages in parallel batches"""
-        batches = [messages[i:i + batch_size] for i in range(0, len(messages), batch_size)]
-        results = []
-        
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_batch = {
-                executor.submit(self.batch_produce, topic, batch): batch 
-                for batch in batches
-            }
-            
-            for future in as_completed(future_to_batch):
-                batch = future_to_batch[future]
-                try:
-                    result = future.result()
-                    results.append(result)
-                    print(f"Batch completed: {len(batch)} messages")
-                except Exception as exc:
-                    print(f"Batch failed: {exc}")
-        
-        return results
-    
-    def consume_all_messages(self, topic, consumer_group, batch_size=100):
-        """Consume all available messages from a topic"""
-        all_messages = []
-        
-        while True:
-            params = {
-                "topic": topic,
-                "consumer_group": consumer_group,
-                "max_messages": batch_size
-            }
-            response = requests.get(f"{self.api_base}/consume", params=params)
-            batch = response.json()
-            
-            messages = batch.get('messages', [])
-            if not messages:
-                break
-            
-            all_messages.extend(messages)
-            print(f"Consumed batch of {len(messages)} messages")
-            
-            if not batch.get('has_more', False):
-                break
-        
-        return all_messages
-
-# Example usage
-if __name__ == "__main__":
-    batch_ops = BatchOperations()
-    topic_name = "batch-test-topic"
-    
-    # Create topic
-    requests.post(f"{API_BASE}/topics", json={
-        "name": topic_name,
-        "partitions": 6,
-        "replication_factor": 1
-    })
-    
-    # Generate test messages
-    messages = []
-    for i in range(1000):
-        messages.append({
-            "key": f"key_{i}",
-            "value": {
-                "id": i,
-                "data": f"test_data_{i}",
-                "timestamp": int(time.time())
-            }
-        })
-    
-    # Produce messages in parallel batches
-    print("Starting batch production...")
-    start_time = time.time()
-    results = batch_ops.parallel_produce(topic_name, messages, batch_size=50, max_workers=10)
-    end_time = time.time()
-    
-    print(f"Produced {len(messages)} messages in {end_time - start_time:.2f} seconds")
-    print(f"Rate: {len(messages) / (end_time - start_time):.2f} messages/second")
-    
-    # Consume all messages
-    print("Starting consumption...")
-    start_time = time.time()
-    consumed_messages = batch_ops.consume_all_messages(topic_name, "batch-consumer")
-    end_time = time.time()
-    
-    print(f"Consumed {len(consumed_messages)} messages in {end_time - start_time:.2f} seconds")
-    print(f"Rate: {len(consumed_messages) / (end_time - start_time):.2f} messages/second")
+# DR capabilities:
+# - Async replication to DR site
+# - Weekly DR testing schedule
+# - Configuration snapshots
+# - Failover procedures
 ```
 
-## 🎯 Use Case Examples
+### Example 4: CI/CD Pipeline
+- Multi-environment deployment pipeline
+- Automated testing integration
+- Snapshot-based rollbacks
+- Environment promotion
 
-### Event Sourcing Pattern
 ```python
-# examples/advanced/event_sourcing.py
-import requests
-import json
-import uuid
-from datetime import datetime
-from typing import List, Dict, Any
-
-API_BASE = "http://localhost:8000"
-
-class EventStore:
-    def __init__(self, api_base=API_BASE):
-        self.api_base = api_base
-        self.events_topic = "events"
-        self.snapshots_topic = "snapshots"
-        self._ensure_topics()
-    
-    def _ensure_topics(self):
-        """Ensure required topics exist"""
-        topics = [
-            {"name": self.events_topic, "partitions": 6},
-            {"name": self.snapshots_topic, "partitions": 3}
-        ]
-        
-        for topic in topics:
-            requests.post(f"{self.api_base}/topics", json=topic)
-    
-    def append_event(self, aggregate_id: str, event_type: str, event_data: Dict[str, Any], expected_version: int = None):
-        """Append an event to the event store"""
-        event = {
-            "event_id": str(uuid.uuid4()),
-            "aggregate_id": aggregate_id,
-            "event_type": event_type,
-            "event_data": event_data,
-            "timestamp": datetime.utcnow().isoformat(),
-            "version": expected_version + 1 if expected_version is not None else 1
-        }
-        
-        message = {
-            "topic": self.events_topic,
-            "key": aggregate_id,
-            "value": event
-        }
-        
-        response = requests.post(f"{self.api_base}/produce", json=message)
-        return response.json()
-    
-    def get_events(self, aggregate_id: str, from_version: int = 0) -> List[Dict[str, Any]]:
-        """Get all events for an aggregate"""
-        # In a real implementation, you'd filter by aggregate_id and version
-        # For this example, we'll consume from the topic
-        params = {
-            "topic": self.events_topic,
-            "consumer_group": f"replay-{aggregate_id}",
-            "max_messages": 1000
-        }
-        
-        response = requests.get(f"{self.api_base}/consume", params=params)
-        messages = response.json().get('messages', [])
-        
-        # Filter events for this aggregate
-        events = [
-            msg['value'] for msg in messages 
-            if msg['key'] == aggregate_id and msg['value']['version'] > from_version
-        ]
-        
-        return sorted(events, key=lambda x: x['version'])
-
-class UserAggregate:
-    def __init__(self, user_id: str, event_store: EventStore):
-        self.user_id = user_id
-        self.event_store = event_store
-        self.version = 0
-        self.email = None
-        self.name = None
-        self.is_active = False
-        self.created_at = None
-        
-        # Load from event store
-        self._load_from_events()
-    
-    def _load_from_events(self):
-        """Rebuild aggregate state from events"""
-        events = self.event_store.get_events(self.user_id)
-        
-        for event in events:
-            self._apply_event(event)
-    
-    def _apply_event(self, event: Dict[str, Any]):
-        """Apply an event to update aggregate state"""
-        event_type = event['event_type']
-        event_data = event['event_data']
-        
-        if event_type == 'UserCreated':
-            self.email = event_data['email']
-            self.name = event_data['name']
-            self.is_active = True
-            self.created_at = event['timestamp']
-        elif event_type == 'UserEmailChanged':
-            self.email = event_data['new_email']
-        elif event_type == 'UserDeactivated':
-            self.is_active = False
-        elif event_type == 'UserReactivated':
-            self.is_active = True
-        
-        self.version = event['version']
-    
-    def create_user(self, email: str, name: str):
-        """Create a new user"""
-        if self.version > 0:
-            raise ValueError("User already exists")
-        
-        event_data = {"email": email, "name": name}
-        self.event_store.append_event(
-            self.user_id, 
-            "UserCreated", 
-            event_data, 
-            self.version
-        )
-        
-        # Apply event locally
-        self._apply_event({
-            "event_type": "UserCreated",
-            "event_data": event_data,
-            "version": self.version + 1,
-            "timestamp": datetime.utcnow().isoformat()
-        })
-    
-    def change_email(self, new_email: str):
-        """Change user email"""
-        if not self.is_active:
-            raise ValueError("Cannot change email for inactive user")
-        
-        event_data = {"old_email": self.email, "new_email": new_email}
-        self.event_store.append_event(
-            self.user_id,
-            "UserEmailChanged",
-            event_data,
-            self.version
-        )
-        
-        self._apply_event({
-            "event_type": "UserEmailChanged",
-            "event_data": event_data,
-            "version": self.version + 1,
-            "timestamp": datetime.utcnow().isoformat()
-        })
-    
-    def deactivate(self):
-        """Deactivate user"""
-        if not self.is_active:
-            raise ValueError("User is already inactive")
-        
-        self.event_store.append_event(
-            self.user_id,
-            "UserDeactivated",
-            {},
-            self.version
-        )
-        
-        self._apply_event({
-            "event_type": "UserDeactivated",
-            "event_data": {},
-            "version": self.version + 1,
-            "timestamp": datetime.utcnow().isoformat()
-        })
-
-# Example usage
-if __name__ == "__main__":
-    event_store = EventStore()
-    user_id = str(uuid.uuid4())
-    
-    # Create and manipulate user
-    user = UserAggregate(user_id, event_store)
-    user.create_user("john@example.com", "John Doe")
-    user.change_email("john.doe@example.com")
-    user.deactivate()
-    
-    print(f"User {user.user_id}:")
-    print(f"  Email: {user.email}")
-    print(f"  Name: {user.name}")
-    print(f"  Active: {user.is_active}")
-    print(f"  Version: {user.version}")
-    
-    # Rebuild from events (simulating loading from persistence)
-    user2 = UserAggregate(user_id, event_store)
-    print(f"\\nRebuilt user {user2.user_id}:")
-    print(f"  Email: {user2.email}")
-    print(f"  Name: {user2.name}")
-    print(f"  Active: {user2.is_active}")
-    print(f"  Version: {user2.version}")
+# Pipeline stages:
+# - Development → Staging → Production
+# - Pre/post deployment snapshots
+# - Automated testing checkpoints
+# - Version tagging and tracking
 ```
 
-## 🔗 Integration Examples
+### Example 5: Resource Optimization and Cleanup
+- Resource usage monitoring
+- Automated cleanup policies
+- Scaling recommendations
+- Quota management
 
-### FastAPI Integration
 ```python
-# examples/integrations/fastapi_integration.py
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from pydantic import BaseModel
-import requests
-import asyncio
-import httpx
-from typing import List, Optional
-
-app = FastAPI(title="Kafka-Integrated API")
-
-# Configuration
-KAFKA_API_BASE = "http://localhost:8000"
-
-# Models
-class UserEvent(BaseModel):
-    user_id: str
-    action: str
-    metadata: Optional[dict] = None
-
-class OrderEvent(BaseModel):
-    order_id: str
-    user_id: str
-    status: str
-    items: List[dict]
-    total_amount: float
-
-# Kafka client wrapper
-class KafkaClient:
-    def __init__(self, base_url: str):
-        self.base_url = base_url
-    
-    async def produce_message(self, topic: str, key: str, value: dict):
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/produce",
-                json={"topic": topic, "key": key, "value": value}
-            )
-            return response.json()
-    
-    async def consume_messages(self, topic: str, consumer_group: str, max_messages: int = 10):
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.base_url}/consume",
-                params={
-                    "topic": topic,
-                    "consumer_group": consumer_group,
-                    "max_messages": max_messages
-                }
-            )
-            return response.json()
-
-kafka_client = KafkaClient(KAFKA_API_BASE)
-
-# API Endpoints
-@app.post("/users/{user_id}/events")
-async def create_user_event(user_id: str, event: UserEvent, background_tasks: BackgroundTasks):
-    """Create a user event and publish to Kafka"""
-    
-    # Validate user exists (mock validation)
-    if not user_id:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
-    
-    # Publish event to Kafka
-    event_data = event.dict()
-    event_data["user_id"] = user_id
-    
-    background_tasks.add_task(
-        kafka_client.produce_message,
-        "user-events",
-        user_id,
-        event_data
-    )
-    
-    return {"message": "Event created", "user_id": user_id, "event": event_data}
-
-@app.post("/orders")
-async def create_order(order: OrderEvent, background_tasks: BackgroundTasks):
-    """Create an order and publish events"""
-    
-    # Publish order event
-    background_tasks.add_task(
-        kafka_client.produce_message,
-        "order-events",
-        order.order_id,
-        order.dict()
-    )
-    
-    # Publish inventory update events
-    for item in order.items:
-        inventory_event = {
-            "product_id": item["product_id"],
-            "quantity_change": -item["quantity"],
-            "reason": "order_placed",
-            "order_id": order.order_id
-        }
-        background_tasks.add_task(
-            kafka_client.produce_message,
-            "inventory-updates",
-            item["product_id"],
-            inventory_event
-        )
-    
-    return {"message": "Order created", "order_id": order.order_id}
-
-@app.get("/events/{topic}")
-async def get_recent_events(topic: str, limit: int = 10):
-    """Get recent events from a topic"""
-    
-    try:
-        result = await kafka_client.consume_messages(
-            topic, 
-            f"api-consumer-{topic}", 
-            limit
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{KAFKA_API_BASE}/health")
-            kafka_status = response.json()
-        
-        return {
-            "status": "healthy",
-            "kafka": kafka_status
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
-
-# Background event processor
-@app.on_event("startup")
-async def startup_event():
-    """Initialize topics and start background processors"""
-    
-    # Create required topics
-    topics = [
-        {"name": "user-events", "partitions": 3},
-        {"name": "order-events", "partitions": 6},
-        {"name": "inventory-updates", "partitions": 3}
-    ]
-    
-    async with httpx.AsyncClient() as client:
-        for topic in topics:
-            try:
-                await client.post(f"{KAFKA_API_BASE}/topics", json=topic)
-            except Exception as e:
-                print(f"Topic creation failed: {e}")
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+# Resource management:
+# - CPU, memory, disk monitoring
+# - Cleanup policies for old clusters
+# - Resource quota enforcement
+# - Optimization recommendations
 ```
 
-## 🧪 Testing Examples
+### Example 6: Configuration Management
+- Configuration versioning
+- Import/export capabilities
+- Rollback functionality
+- Validation and comparison
 
-### Integration Testing
 ```python
-# examples/testing/integration_tests.py
+# Config features:
+# - YAML/JSON export/import
+# - Version history tracking
+# - Configuration comparison
+# - Automated rollback
+```
+
+### Example 7: Comprehensive Monitoring
+- System-wide health monitoring
+- Custom alert handlers
+- Metrics collection
+- Health trend analysis
+
+```python
+# Monitoring capabilities:
+# - Real-time health status
+# - Custom alert routing
+# - Performance metrics
+# - Trend analysis
+```
+
+## API Examples (`api_examples.py`)
+
+### Example 1: Basic Cluster Operations
+- CRUD operations for clusters
+- Cluster lifecycle management
+- Status monitoring
+
+```bash
+# API endpoints covered:
+# POST /api/v1/clusters
+# GET /api/v1/clusters/{id}
+# PUT /api/v1/clusters/{id}
+# DELETE /api/v1/clusters/{id}
+# POST /api/v1/clusters/{id}/start
+# POST /api/v1/clusters/{id}/stop
+```
+
+### Example 2: Advanced Cluster Features
+- Cluster cloning
+- Snapshot management
+- Automated scheduling
+- Tag-based operations
+
+```bash
+# Advanced endpoints:
+# POST /api/v1/advanced/clusters/clone
+# POST /api/v1/advanced/snapshots
+# POST /api/v1/advanced/schedules
+# POST /api/v1/advanced/clusters/tags
+# POST /api/v1/advanced/clusters/search
+```
+
+### Example 3: Configuration Management
+- Configuration export/import
+- Version management
+- Validation and rollback
+
+```bash
+# Configuration endpoints:
+# GET /api/v1/config/export/{cluster_id}
+# POST /api/v1/config/import
+# POST /api/v1/config/validate
+# GET /api/v1/config/versions/{cluster_id}
+# POST /api/v1/config/rollback
+```
+
+### Example 4: Monitoring and Health
+- Health status checking
+- Metrics collection
+- Alert management
+
+```bash
+# Monitoring endpoints:
+# GET /api/v1/monitoring/health
+# GET /api/v1/monitoring/clusters/{id}/health
+# GET /api/v1/monitoring/metrics
+# GET /api/v1/monitoring/alerts
+# POST /api/v1/monitoring/alerts/{id}/acknowledge
+```
+
+### Example 5: Security and Access Control
+- User management
+- Permission handling
+- API key management
+- Audit logging
+
+```bash
+# Security endpoints:
+# POST /api/v1/auth/users
+# GET /api/v1/auth/users
+# POST /api/v1/auth/permissions
+# POST /api/v1/auth/api-keys
+# GET /api/v1/auth/audit
+```
+
+### Example 6: Resource Management
+- Resource usage monitoring
+- Quota management
+- Optimization recommendations
+- Cleanup operations
+
+```bash
+# Resource endpoints:
+# GET /api/v1/resources/usage
+# GET /api/v1/resources/clusters/{id}/usage
+# POST /api/v1/resources/quotas
+# GET /api/v1/resources/optimization
+# POST /api/v1/resources/cleanup
+```
+
+## Configuration Examples
+
+### Cluster Templates
+
+#### Development Template
+```yaml
+# templates/development.yaml
+name: "Development Template"
+environment: "development"
+resources:
+  cpu_limit: "1"
+  memory_limit: "2Gi"
+  disk_limit: "10Gi"
+kafka_config:
+  log.retention.hours: "24"
+  log.segment.bytes: "104857600"
+  auto.create.topics.enable: "true"
+services:
+  - kafka
+  - rest-proxy
+  - ui
+```
+
+#### Production Template
+```yaml
+# templates/production.yaml
+name: "Production Template"
+environment: "production"
+resources:
+  cpu_limit: "4"
+  memory_limit: "8Gi"
+  disk_limit: "100Gi"
+kafka_config:
+  log.retention.hours: "168"
+  log.segment.bytes: "1073741824"
+  auto.create.topics.enable: "false"
+  min.insync.replicas: "2"
+  default.replication.factor: "3"
+services:
+  - kafka
+  - rest-proxy
+  - ui
+  - jmx-exporter
+monitoring:
+  enabled: true
+  alerts:
+    - high_cpu_usage
+    - high_memory_usage
+    - disk_space_low
+```
+
+### Docker Compose Examples
+
+#### Multi-Cluster Setup
+```yaml
+# docker-compose.multi-cluster.yml
+version: '3.8'
+
+services:
+  multi-cluster-manager:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/multi_cluster
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: multi_cluster
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:6-alpine
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+## Integration Examples
+
+### Kubernetes Integration
+```yaml
+# k8s/multi-cluster-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-cluster-kafka-manager
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: multi-cluster-kafka-manager
+  template:
+    metadata:
+      labels:
+        app: multi-cluster-kafka-manager
+    spec:
+      containers:
+      - name: manager
+        image: multi-cluster-kafka-manager:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: url
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+```
+
+### Terraform Integration
+```hcl
+# terraform/multi-cluster.tf
+resource "aws_instance" "kafka_cluster" {
+  count         = var.cluster_count
+  ami           = var.kafka_ami
+  instance_type = var.instance_type
+  
+  tags = {
+    Name = "kafka-cluster-${count.index + 1}"
+    Environment = var.environment
+    ManagedBy = "multi-cluster-kafka-manager"
+  }
+}
+
+resource "aws_security_group" "kafka" {
+  name_prefix = "kafka-cluster-"
+  
+  ingress {
+    from_port   = 9092
+    to_port     = 9092
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+  
+  ingress {
+    from_port   = 8082
+    to_port     = 8082
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+}
+```
+
+## Testing Examples
+
+### Unit Test Examples
+```python
+# tests/examples/test_cluster_operations.py
 import pytest
-import requests
-import time
-import json
-from typing import List, Dict
+from examples.complete_examples import MultiClusterExamples
 
-class TestKafkaIntegration:
-    """Integration tests for Kafka Manager API"""
+@pytest.mark.asyncio
+async def test_development_environment_setup():
+    """Test development environment setup example."""
+    examples = MultiClusterExamples()
     
-    @pytest.fixture(scope="class")
-    def api_base(self):
-        return "http://localhost:8000"
+    # Run the example
+    clusters = await examples.example_1_development_environment_setup()
     
-    @pytest.fixture(scope="class")
-    def test_topic(self):
-        return "integration-test-topic"
+    # Verify clusters were created
+    assert len(clusters) == 4
+    assert all(cluster.environment == "development" for cluster in clusters)
     
-    @pytest.fixture(scope="class", autouse=True)
-    def setup_test_environment(self, api_base, test_topic):
-        """Setup test environment"""
-        # Create test topic
-        response = requests.post(f"{api_base}/topics", json={
-            "name": test_topic,
-            "partitions": 3,
-            "replication_factor": 1
-        })
-        assert response.status_code in [200, 201, 409]  # 409 if topic exists
-        
-        yield
-        
-        # Cleanup
-        try:
-            requests.delete(f"{api_base}/topics/{test_topic}")
-        except:
-            pass
-    
-    def test_health_endpoint(self, api_base):
-        """Test API health endpoint"""
-        response = requests.get(f"{api_base}/health")
-        assert response.status_code == 200
-        
-        data = response.json()
-        assert "status" in data
-        assert data["status"] in ["healthy", "degraded"]
-    
-    def test_topic_lifecycle(self, api_base):
-        """Test complete topic lifecycle"""
-        topic_name = "lifecycle-test-topic"
-        
-        # Create topic
-        create_response = requests.post(f"{api_base}/topics", json={
-            "name": topic_name,
-            "partitions": 2,
-            "replication_factor": 1
-        })
-        assert create_response.status_code in [200, 201]
-        
-        # List topics
-        list_response = requests.get(f"{api_base}/topics")
-        assert list_response.status_code == 200
-        topics = list_response.json()
-        topic_names = [t["name"] for t in topics.get("topics", [])]
-        assert topic_name in topic_names
-        
-        # Get topic details
-        detail_response = requests.get(f"{api_base}/topics/{topic_name}")
-        assert detail_response.status_code == 200
-        details = detail_response.json()
-        assert details["name"] == topic_name
-        assert details["partitions"] == 2
-        
-        # Delete topic
-        delete_response = requests.delete(f"{api_base}/topics/{topic_name}")
-        assert delete_response.status_code == 200
-    
-    def test_message_produce_consume_cycle(self, api_base, test_topic):
-        """Test complete message lifecycle"""
-        
-        # Produce messages
-        test_messages = [
-            {"key": "test1", "value": {"data": "message1", "id": 1}},
-            {"key": "test2", "value": {"data": "message2", "id": 2}},
-            {"key": "test3", "value": {"data": "message3", "id": 3}}
-        ]
-        
-        produced_offsets = []
-        for msg in test_messages:
-            response = requests.post(f"{api_base}/produce", json={
-                "topic": test_topic,
-                "key": msg["key"],
-                "value": msg["value"]
-            })
-            assert response.status_code == 200
-            result = response.json()
-            assert "result" in result
-            produced_offsets.append(result["result"]["offset"])
-        
-        # Wait for messages to be available
-        time.sleep(1)
-        
-        # Consume messages
-        consume_response = requests.get(f"{api_base}/consume", params={
-            "topic": test_topic,
-            "consumer_group": "integration-test-group",
-            "max_messages": 10
-        })
-        assert consume_response.status_code == 200
-        
-        consumed_data = consume_response.json()
-        consumed_messages = consumed_data.get("messages", [])
-        
-        # Verify messages
-        assert len(consumed_messages) >= len(test_messages)
-        
-        consumed_keys = [msg["key"] for msg in consumed_messages]
-        for test_msg in test_messages:
-            assert test_msg["key"] in consumed_keys
-    
-    def test_batch_operations(self, api_base, test_topic):
-        """Test batch produce operations"""
-        
-        # Prepare batch messages
-        batch_messages = [
-            {"key": f"batch_{i}", "value": {"batch_id": i, "data": f"batch_data_{i}"}}
-            for i in range(20)
-        ]
-        
-        # Batch produce
-        batch_response = requests.post(f"{api_base}/produce/batch", json={
-            "topic": test_topic,
-            "messages": batch_messages
-        })
-        assert batch_response.status_code == 200
-        
-        batch_result = batch_response.json()
-        assert "results" in batch_result
-        assert len(batch_result["results"]) == len(batch_messages)
-        assert batch_result["total_produced"] == len(batch_messages)
-        assert batch_result["failed_count"] == 0
-    
-    def test_error_handling(self, api_base):
-        """Test API error handling"""
-        
-        # Test invalid topic name
-        invalid_topic_response = requests.post(f"{api_base}/topics", json={
-            "name": "invalid-topic-name!@#",
-            "partitions": 1,
-            "replication_factor": 1
-        })
-        assert invalid_topic_response.status_code == 400
-        
-        # Test produce to non-existent topic
-        produce_response = requests.post(f"{api_base}/produce", json={
-            "topic": "non-existent-topic-12345",
-            "key": "test",
-            "value": {"data": "test"}
-        })
-        assert produce_response.status_code in [400, 404, 500]
-        
-        # Test consume from non-existent topic
-        consume_response = requests.get(f"{api_base}/consume", params={
-            "topic": "non-existent-topic-12345",
-            "consumer_group": "test-group",
-            "max_messages": 1
-        })
-        assert consume_response.status_code in [400, 404, 500]
-    
-    def test_concurrent_operations(self, api_base, test_topic):
-        """Test concurrent produce/consume operations"""
-        import threading
-        import queue
-        
-        results_queue = queue.Queue()
-        
-        def producer_worker(worker_id: int, message_count: int):
-            """Producer worker function"""
-            try:
-                for i in range(message_count):
-                    response = requests.post(f"{api_base}/produce", json={
-                        "topic": test_topic,
-                        "key": f"worker_{worker_id}_msg_{i}",
-                        "value": {"worker_id": worker_id, "message_id": i}
-                    })
-                    assert response.status_code == 200
-                results_queue.put(("producer", worker_id, "success", message_count))
-            except Exception as e:
-                results_queue.put(("producer", worker_id, "error", str(e)))
-        
-        def consumer_worker(worker_id: int):
-            """Consumer worker function"""
-            try:
-                response = requests.get(f"{api_base}/consume", params={
-                    "topic": test_topic,
-                    "consumer_group": f"concurrent-test-group-{worker_id}",
-                    "max_messages": 50
-                })
-                assert response.status_code == 200
-                data = response.json()
-                message_count = len(data.get("messages", []))
-                results_queue.put(("consumer", worker_id, "success", message_count))
-            except Exception as e:
-                results_queue.put(("consumer", worker_id, "error", str(e)))
-        
-        # Start producer threads
-        producer_threads = []
-        for i in range(3):
-            thread = threading.Thread(target=producer_worker, args=(i, 10))
-            thread.start()
-            producer_threads.append(thread)
-        
-        # Wait for producers to complete
-        for thread in producer_threads:
-            thread.join()
-        
-        # Wait for messages to be available
-        time.sleep(2)
-        
-        # Start consumer threads
-        consumer_threads = []
-        for i in range(2):
-            thread = threading.Thread(target=consumer_worker, args=(i,))
-            thread.start()
-            consumer_threads.append(thread)
-        
-        # Wait for consumers to complete
-        for thread in consumer_threads:
-            thread.join()
-        
-        # Collect results
-        results = []
-        while not results_queue.empty():
-            results.append(results_queue.get())
-        
-        # Verify results
-        producer_results = [r for r in results if r[0] == "producer"]
-        consumer_results = [r for r in results if r[0] == "consumer"]
-        
-        assert len(producer_results) == 3
-        assert len(consumer_results) == 2
-        
-        # All operations should succeed
-        for result in results:
-            assert result[2] == "success", f"Operation failed: {result}"
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    # Cleanup
+    for cluster in clusters:
+        await examples.manager.stop_cluster(cluster.id)
+        await examples.manager.delete_cluster(cluster.id)
 ```
 
-## 🚀 Getting Started
+### Integration Test Examples
+```python
+# tests/examples/test_api_integration.py
+import pytest
+from examples.api_examples import MultiClusterAPIExamples
 
-1. **Start Local Kafka Manager**:
-   ```bash
-   cd /path/to/kafka-cluster
-   ./start.sh
-   ```
+def test_basic_cluster_operations():
+    """Test basic cluster operations via API."""
+    api_examples = MultiClusterAPIExamples()
+    
+    # This will create, start, stop, and delete a cluster
+    cluster_id = api_examples.example_1_basic_cluster_operations()
+    
+    # Verify cluster was properly cleaned up
+    response = api_examples._make_request("GET", "/api/v1/clusters")
+    clusters = response.json()
+    
+    # Cluster should not exist anymore
+    assert not any(cluster["id"] == cluster_id for cluster in clusters)
+```
 
-2. **Install example dependencies**:
-   ```bash
-   pip install requests httpx fastapi uvicorn pytest
-   ```
+## Performance Examples
 
-3. **Run basic examples**:
-   ```bash
-   python examples/basic/producer_consumer.py
-   python examples/basic/topic_management.py
-   python examples/basic/batch_operations.py
-   ```
+### Load Testing
+```python
+# examples/performance/load_test.py
+import asyncio
+import time
+from concurrent.futures import ThreadPoolExecutor
+from examples.api_examples import MultiClusterAPIExamples
 
-4. **Run integration tests**:
-   ```bash
-   python examples/testing/integration_tests.py
-   ```
+async def load_test_cluster_creation():
+    """Load test cluster creation."""
+    api_examples = MultiClusterAPIExamples()
+    
+    async def create_test_cluster(cluster_num):
+        cluster_data = {
+            "id": f"load-test-cluster-{cluster_num}",
+            "name": f"Load Test Cluster {cluster_num}",
+            "environment": "testing",
+            "template_id": "testing",
+            "port_allocation": {
+                "kafka_port": 9200 + cluster_num,
+                "rest_proxy_port": 8200 + cluster_num,
+                "ui_port": 8300 + cluster_num
+            }
+        }
+        
+        start_time = time.time()
+        response = api_examples._make_request("POST", "/api/v1/clusters", json=cluster_data)
+        end_time = time.time()
+        
+        return end_time - start_time, response.json()
+    
+    # Create 10 clusters concurrently
+    tasks = [create_test_cluster(i) for i in range(10)]
+    results = await asyncio.gather(*tasks)
+    
+    # Calculate statistics
+    creation_times = [result[0] for result in results]
+    avg_time = sum(creation_times) / len(creation_times)
+    max_time = max(creation_times)
+    min_time = min(creation_times)
+    
+    print(f"Cluster creation performance:")
+    print(f"  Average: {avg_time:.2f}s")
+    print(f"  Maximum: {max_time:.2f}s")
+    print(f"  Minimum: {min_time:.2f}s")
+    
+    # Cleanup
+    for i, (_, cluster) in enumerate(results):
+        api_examples._make_request("DELETE", f"/api/v1/clusters/{cluster['id']}")
+```
 
-5. **Try advanced patterns**:
-   ```bash
-   python examples/advanced/event_sourcing.py
-   ```
+## Troubleshooting Examples
 
-## 📚 Additional Resources
+### Common Issues and Solutions
 
-- **API Documentation**: http://localhost:8000/docs
-- **Kafka UI**: http://localhost:8080
-- **Main Documentation**: [../README.md](../README.md)
-- **Contributing Guide**: [../CONTRIBUTING.md](../CONTRIBUTING.md)
+#### Port Conflicts
+```python
+# examples/troubleshooting/port_conflicts.py
+import socket
+from examples.complete_examples import MultiClusterExamples
 
----
+def find_available_port(start_port=9092, max_attempts=100):
+    """Find an available port starting from start_port."""
+    for port in range(start_port, start_port + max_attempts):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('localhost', port))
+                return port
+        except OSError:
+            continue
+    raise RuntimeError(f"No available ports found in range {start_port}-{start_port + max_attempts}")
 
-*These examples demonstrate real-world usage patterns. Modify them to fit your specific use cases!*
+# Use in cluster creation
+available_port = find_available_port()
+print(f"Using available port: {available_port}")
+```
+
+#### Resource Constraints
+```python
+# examples/troubleshooting/resource_monitoring.py
+import psutil
+import asyncio
+from examples.complete_examples import MultiClusterExamples
+
+async def monitor_resources_during_cluster_creation():
+    """Monitor system resources during cluster creation."""
+    examples = MultiClusterExamples()
+    
+    # Start monitoring
+    initial_memory = psutil.virtual_memory().percent
+    initial_cpu = psutil.cpu_percent(interval=1)
+    
+    print(f"Initial resource usage:")
+    print(f"  Memory: {initial_memory}%")
+    print(f"  CPU: {initial_cpu}%")
+    
+    # Create cluster while monitoring
+    clusters = await examples.example_1_development_environment_setup()
+    
+    # Check final resource usage
+    final_memory = psutil.virtual_memory().percent
+    final_cpu = psutil.cpu_percent(interval=1)
+    
+    print(f"Final resource usage:")
+    print(f"  Memory: {final_memory}% (delta: +{final_memory - initial_memory}%)")
+    print(f"  CPU: {final_cpu}% (delta: +{final_cpu - initial_cpu}%)")
+    
+    # Cleanup
+    for cluster in clusters:
+        await examples.manager.stop_cluster(cluster.id)
+        await examples.manager.delete_cluster(cluster.id)
+```
+
+## Best Practices Examples
+
+### Error Handling
+```python
+# examples/best_practices/error_handling.py
+import asyncio
+import logging
+from examples.complete_examples import MultiClusterExamples
+
+async def robust_cluster_creation():
+    """Example of robust cluster creation with error handling."""
+    examples = MultiClusterExamples()
+    logger = logging.getLogger(__name__)
+    
+    max_retries = 3
+    retry_delay = 5  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            clusters = await examples.example_1_development_environment_setup()
+            logger.info(f"Successfully created {len(clusters)} clusters")
+            return clusters
+            
+        except Exception as e:
+            logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
+            
+            if attempt < max_retries - 1:
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+            else:
+                logger.error("All attempts failed")
+                raise
+```
+
+### Configuration Validation
+```python
+# examples/best_practices/config_validation.py
+from pydantic import BaseModel, validator
+from typing import Dict, Any
+
+class ClusterConfigValidator(BaseModel):
+    """Validate cluster configuration before creation."""
+    
+    id: str
+    name: str
+    environment: str
+    port_allocation: Dict[str, int]
+    tags: Dict[str, str] = {}
+    
+    @validator('id')
+    def validate_id(cls, v):
+        if not v.replace('-', '').replace('_', '').isalnum():
+            raise ValueError('ID must contain only alphanumeric characters, hyphens, and underscores')
+        if len(v) > 50:
+            raise ValueError('ID must be 50 characters or less')
+        return v
+    
+    @validator('environment')
+    def validate_environment(cls, v):
+        valid_environments = ['development', 'testing', 'staging', 'production']
+        if v not in valid_environments:
+            raise ValueError(f'Environment must be one of: {valid_environments}')
+        return v
+    
+    @validator('port_allocation')
+    def validate_ports(cls, v):
+        required_ports = ['kafka_port', 'rest_proxy_port', 'ui_port']
+        for port_name in required_ports:
+            if port_name not in v:
+                raise ValueError(f'Missing required port: {port_name}')
+            
+            port = v[port_name]
+            if not (1024 <= port <= 65535):
+                raise ValueError(f'Port {port_name} must be between 1024 and 65535')
+        
+        return v
+
+# Usage example
+def validate_cluster_config(config_dict: Dict[str, Any]) -> ClusterConfigValidator:
+    """Validate cluster configuration."""
+    try:
+        return ClusterConfigValidator(**config_dict)
+    except Exception as e:
+        print(f"Configuration validation failed: {str(e)}")
+        raise
+```
+
+## Running the Examples
+
+### Prerequisites
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Start the multi-cluster manager
+python -m src.main
+
+# Or use Docker
+docker-compose up -d
+```
+
+### Environment Setup
+```bash
+# Set environment variables
+export MULTI_CLUSTER_API_URL=http://localhost:8000
+export MULTI_CLUSTER_API_KEY=your-api-key-here
+
+# Or create a .env file
+echo "MULTI_CLUSTER_API_URL=http://localhost:8000" > .env
+echo "MULTI_CLUSTER_API_KEY=your-api-key-here" >> .env
+```
+
+### Running Examples
+```bash
+# Run all complete examples
+python examples/complete_examples.py
+
+# Run all API examples
+python examples/api_examples.py
+
+# Run specific example
+python examples/complete_examples.py
+# Then select from the interactive menu
+
+# Run with custom configuration
+python examples/api_examples.py --base-url http://your-server:8000 --api-key your-key
+```
+
+For more detailed information, see the [Multi-Cluster Guide](../docs/MULTI_CLUSTER_GUIDE.md).

@@ -31,15 +31,18 @@ class MessageManager:
     """Manages Kafka message operations using Kafka REST Proxy."""
     
     def __init__(self, rest_proxy_url: Optional[str] = None, 
-                 request_timeout: Optional[int] = None):
+                 request_timeout: Optional[int] = None,
+                 cluster_id: Optional[str] = None):
         """Initialize the message manager.
         
         Args:
             rest_proxy_url: Kafka REST Proxy URL (uses config if None)
             request_timeout: Request timeout in seconds (uses config if None)
+            cluster_id: Cluster ID for multi-cluster operations (uses default if None)
         """
         from ..config import settings
         
+        self.cluster_id = cluster_id or "default"
         self.rest_proxy_url = (rest_proxy_url or settings.get_rest_proxy_url()).rstrip('/')
         self.request_timeout = request_timeout or settings.kafka_rest_proxy.request_timeout
         self._http_client: Optional[httpx.AsyncClient] = None
@@ -90,12 +93,12 @@ class MessageManager:
             MessageProduceError: If message production fails
             KafkaRestProxyNotAvailableError: If REST Proxy is not available
         """
-        logger.info(f"Producing message to topic: {request.topic}")
+        logger.info(f"Producing message to topic: {request.topic} in cluster: {self.cluster_id}")
         
         # Check REST Proxy availability
         if not await self._check_rest_proxy_health():
             raise KafkaRestProxyNotAvailableError(
-                message=f"Kafka REST Proxy is not available at {self.rest_proxy_url}"
+                message=f"Kafka REST Proxy for cluster {self.cluster_id} is not available at {self.rest_proxy_url}"
             )
         
         try:
@@ -141,7 +144,7 @@ class MessageManager:
                 
                 raise MessageProduceError(
                     topic=request.topic,
-                    reason=f"HTTP {response.status_code} - {error_detail}"
+                    reason=f"Cluster {self.cluster_id}: HTTP {response.status_code} - {error_detail}"
                 )
             
             # Parse the response
