@@ -1,0 +1,29 @@
+backup:
+  directory: null
+  enabled: false
+  retention_days: 30
+clusters: []
+directories:
+  base: /Users/aadityasinha/code/kafka-cluster
+  config: /Users/aadityasinha/code/kafka-cluster/config
+  data: /Users/aadityasinha/code/kafka-cluster/data
+installation:
+  installed_at: '2025-08-07T19:32:36.287472'
+  scenario: development
+  type: fresh_install
+  version: '1.0'
+multi_cluster:
+  default_cluster_count: 1
+  enabled: true
+  port_range:
+    end: 9999
+    start: 9000
+resources:
+  auto_cleanup_enabled: true
+  max_disk_gb: 50
+  max_memory_mb: 4096
+  monitoring_enabled: false
+security:
+  admin_username: admin
+  authentication_enabled: false
+  ssl_enabled: false

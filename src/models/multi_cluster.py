@@ -22,6 +22,17 @@ class ClusterEnvironment(str, Enum):
     PRODUCTION = "production"
 
 
+class ClusterLifecycleStatus(str, Enum):
+    """Lifecycle status of a cluster in the registry."""
+    REGISTERED = "registered"
+    STARTING = "starting"
+    RUNNING = "running"
+    STOPPING = "stopping"
+    STOPPED = "stopped"
+    ERROR = "error"
+    DELETED = "deleted"
+
+
 class OperationStatus(str, Enum):
     """Status of cross-cluster operations."""
     PENDING = "pending"
@@ -186,7 +197,7 @@ class ClusterDefinition(BaseModel):
     tags: Dict[str, str] = Field(default_factory=dict, description="Cluster tags")
     
     # Status
-    status: ServiceStatus = Field(default=ServiceStatus.STOPPED, description="Current cluster status")
+    status: ClusterLifecycleStatus = Field(default=ClusterLifecycleStatus.REGISTERED, description="Current cluster lifecycle status")
     last_started: Optional[datetime] = Field(None, description="Last start timestamp")
     last_stopped: Optional[datetime] = Field(None, description="Last stop timestamp")
     

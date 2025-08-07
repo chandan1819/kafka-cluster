@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Set, Any, Tuple
 from pathlib import Path
 
-from ..models.multi_cluster import ClusterDefinition, ClusterStatus, PortAllocation
+from ..models.multi_cluster import ClusterDefinition, ClusterLifecycleStatus, PortAllocation
 from ..storage.base import StorageBackend
 from ..storage.file_backend import FileStorageBackend
 from ..networking.port_allocator import PortAllocator, GlobalPortAllocator
@@ -45,7 +45,7 @@ class ClusterRegistry:
         
         # In-memory cache of cluster definitions
         self._clusters: Dict[str, ClusterDefinition] = {}
-        self._cluster_status: Dict[str, ClusterStatus] = {}
+        self._cluster_status: Dict[str, ClusterLifecycleStatus] = {}
         
         # Thread safety
         self._lock = asyncio.Lock()
@@ -77,7 +77,7 @@ class ClusterRegistry:
                 for cluster in clusters:
                     self._clusters[cluster.id] = cluster
                     # Initialize status as stopped (will be updated by health checks)
-                    self._cluster_status[cluster.id] = ClusterStatus.STOPPED
+                    self._cluster_status[cluster.id] = ClusterLifecycleStatus.STOPPED
                 
                 logger.info(f"Loaded {len(clusters)} clusters from storage")
                 
@@ -121,29 +121,36 @@ class ClusterRegistry:
                 # Set registration metadata
                 definition.created_at = datetime.utcnow()
                 definition.updated_at = definition.created_at
-                definition.status = ClusterStatus.REGISTERED
+                definition.status = ClusterLifecycleStatus.REGISTERED
+                logger.debug(f"Set cluster status to REGISTERED for '{definition.id}'")
                 
                 # Allocate ports if not already allocated
                 if not definition.port_allocation:
+                    logger.debug(f"Allocating ports for cluster '{definition.id}'")
                     port_allocator = await self._get_port_allocator()
                     definition.port_allocation = await port_allocator.allocate_ports(definition.id)
+                    logger.debug(f"Allocated ports for cluster '{definition.id}': {definition.port_allocation}")
                 
                 # Create network name if not set
                 if not definition.network_name:
                     definition.network_name = f"kafka-cluster-{definition.id}"
+                    logger.debug(f"Set network name for cluster '{definition.id}': {definition.network_name}")
                 
                 # Save to storage
+                logger.debug(f"Saving cluster '{definition.id}' to storage")
                 await self.storage.save_cluster(definition)
+                logger.debug(f"Successfully saved cluster '{definition.id}' to storage")
                 
                 # Add to in-memory cache
                 self._clusters[definition.id] = definition
-                self._cluster_status[definition.id] = ClusterStatus.REGISTERED
+                self._cluster_status[definition.id] = ClusterLifecycleStatus.REGISTERED
                 
                 logger.info(f"Registered cluster '{definition.id}' successfully")
                 return True
                 
             except Exception as e:
-                logger.error(f"Failed to register cluster '{definition.id}': {e}")
+                logger.error(f"Failed to register cluster '{definition.id}': {e} (type: {type(e).__name__})")
+                logger.debug(f"Exception details: {repr(e)}")
                 
                 # Cleanup on failure
                 await self._cleanup_failed_registration(definition.id)
@@ -169,10 +176,10 @@ class ClusterRegistry:
                 raise ClusterNotFoundError(cluster_id, list(self._clusters.keys()))
             
             cluster = self._clusters[cluster_id]
-            status = self._cluster_status.get(cluster_id, ClusterStatus.UNKNOWN)
+            status = self._cluster_status.get(cluster_id, ClusterLifecycleStatus.ERROR)
             
             # Check if cluster is running
-            if status in [ClusterStatus.STARTING, ClusterStatus.RUNNING] and not force:
+            if status in [ClusterLifecycleStatus.STARTING, ClusterLifecycleStatus.RUNNING] and not force:
                 raise ClusterOperationError(
                     cluster_id, 
                     "unregister", 
@@ -223,7 +230,7 @@ class ClusterRegistry:
         return self._clusters[cluster_id].copy()
     
     async def list_clusters(self, 
-                          status_filter: Optional[ClusterStatus] = None,
+                          status_filter: Optional[ClusterLifecycleStatus] = None,
                           environment_filter: Optional[str] = None,
                           tag_filter: Optional[Dict[str, str]] = None) -> List[ClusterDefinition]:
         """List all registered clusters with optional filtering.
@@ -241,7 +248,7 @@ class ClusterRegistry:
         for cluster in self._clusters.values():
             # Apply status filter
             if status_filter is not None:
-                cluster_status = self._cluster_status.get(cluster.id, ClusterStatus.UNKNOWN)
+                cluster_status = self._cluster_status.get(cluster.id, ClusterLifecycleStatus.ERROR)
                 if cluster_status != status_filter:
                     continue
             
@@ -313,7 +320,7 @@ class ClusterRegistry:
                 logger.error(f"Failed to update cluster '{cluster_id}': {e}")
                 raise ClusterOperationError(cluster_id, "update", str(e))
     
-    async def get_cluster_status(self, cluster_id: str) -> ClusterStatus:
+    async def get_cluster_status(self, cluster_id: str) -> ClusterLifecycleStatus:
         """Get current status of a cluster.
         
         Args:
@@ -328,9 +335,9 @@ class ClusterRegistry:
         if cluster_id not in self._clusters:
             raise ClusterNotFoundError(cluster_id, list(self._clusters.keys()))
         
-        return self._cluster_status.get(cluster_id, ClusterStatus.UNKNOWN)
+        return self._cluster_status.get(cluster_id, ClusterLifecycleStatus.ERROR)
     
-    async def update_cluster_status(self, cluster_id: str, status: ClusterStatus) -> None:
+    async def update_cluster_status(self, cluster_id: str, status: ClusterLifecycleStatus) -> None:
         """Update cluster status.
         
         Args:
@@ -343,16 +350,16 @@ class ClusterRegistry:
         if cluster_id not in self._clusters:
             raise ClusterNotFoundError(cluster_id, list(self._clusters.keys()))
         
-        old_status = self._cluster_status.get(cluster_id, ClusterStatus.UNKNOWN)
+        old_status = self._cluster_status.get(cluster_id, ClusterLifecycleStatus.ERROR)
         self._cluster_status[cluster_id] = status
         
         # Update cluster definition status and timestamps
         cluster = self._clusters[cluster_id]
         cluster.status = status
         
-        if status == ClusterStatus.RUNNING:
+        if status == ClusterLifecycleStatus.RUNNING:
             cluster.last_started = datetime.utcnow()
-        elif status == ClusterStatus.STOPPED:
+        elif status == ClusterLifecycleStatus.STOPPED:
             cluster.last_stopped = datetime.utcnow()
         
         # Save updated cluster to storage
@@ -364,7 +371,7 @@ class ClusterRegistry:
         if old_status != status:
             logger.info(f"Cluster '{cluster_id}' status changed from {old_status} to {status}")
     
-    async def get_all_cluster_status(self) -> Dict[str, ClusterStatus]:
+    async def get_all_cluster_status(self) -> Dict[str, ClusterLifecycleStatus]:
         """Get status of all registered clusters.
         
         Returns:
@@ -463,7 +470,7 @@ class ClusterRegistry:
         
         for cluster in self._clusters.values():
             # Count by status
-            status = self._cluster_status.get(cluster.id, ClusterStatus.UNKNOWN)
+            status = self._cluster_status.get(cluster.id, ClusterLifecycleStatus.ERROR)
             status_counts[status.value] = status_counts.get(status.value, 0) + 1
             
             # Count by environment
@@ -517,7 +524,7 @@ class ClusterRegistry:
             network_exists = await network_manager.network_exists(cluster_id)
             health_result["checks"]["network_exists"] = network_exists
             
-            if not network_exists and self._cluster_status.get(cluster_id) == ClusterStatus.RUNNING:
+            if not network_exists and self._cluster_status.get(cluster_id) == ClusterLifecycleStatus.RUNNING:
                 health_result["issues"].append("Network does not exist but cluster is marked as running")
                 health_result["overall_health"] = "unhealthy"
             

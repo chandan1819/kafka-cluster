@@ -24,6 +24,7 @@ from src.services.template_manager import TemplateManager
 from src.registry.cluster_registry import ClusterRegistry
 from src.storage.file_backend import FileStorageBackend
 from src.exceptions import InstallationError, ValidationError
+from src.registry.exceptions import ClusterNotFoundError
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -1221,22 +1222,39 @@ class MultiClusterInstaller:
             
             if config.deployment_scenario == DeploymentScenario.DEVELOPMENT:
                 # Single development cluster
-                cluster = ClusterDefinition(
-                    id="dev-cluster",
-                    name="Development Cluster",
-                    description="Default development cluster",
-                    environment="development",
-                    template_id="development",
-                    port_allocation=PortAllocation(
-                        kafka_port=9092,
-                        rest_proxy_port=8082,
-                        ui_port=8080
-                    ),
-                    tags={"default": "true", "environment": "dev"}
-                )
+                cluster_id = "dev-cluster"
                 
-                await cluster_registry.register_cluster(cluster)
-                created_clusters.append(cluster.id)
+                # Check if cluster already exists
+                try:
+                    logger.debug(f"Checking if cluster '{cluster_id}' already exists")
+                    existing_cluster = await cluster_registry.get_cluster(cluster_id)
+                    logger.info(f"Cluster '{cluster_id}' already exists, skipping creation")
+                    created_clusters.append(cluster_id)
+                except ClusterNotFoundError as e:
+                    # Cluster doesn't exist, create it
+                    logger.debug(f"Cluster '{cluster_id}' not found, creating new cluster: {e}")
+                except Exception as e:
+                    # Catch any other exception to debug
+                    logger.error(f"Unexpected exception when checking cluster '{cluster_id}': {e} (type: {type(e).__name__})")
+                    # Assume cluster doesn't exist and try to create it
+                    logger.debug(f"Assuming cluster '{cluster_id}' doesn't exist, attempting to create it")
+                    cluster = ClusterDefinition(
+                        id=cluster_id,
+                        name="Development Cluster",
+                        description="Default development cluster",
+                        environment="development",
+                        template_id="development",
+                        port_allocation=PortAllocation(
+                            kafka_port=9092,
+                            rest_proxy_port=8082,
+                            ui_port=8080
+                        ),
+                        tags={"default": "true", "environment": "dev"}
+                    )
+                    
+                    await cluster_registry.register_cluster(cluster)
+                    created_clusters.append(cluster.id)
+                    logger.info(f"Created default cluster: {cluster_id}")
             
             elif config.deployment_scenario == DeploymentScenario.TESTING:
                 # Development and testing clusters
@@ -1476,6 +1494,97 @@ class MultiClusterInstaller:
         except Exception as e:
             raise InstallationError(f"Post-installation setup failed: {e}")
     
+    async def _setup_log_rotation(self, config: InstallationConfig) -> None:
+        """Set up log rotation configuration."""
+        try:
+            logger.info("Setting up log rotation...")
+            
+            # Create logs directory
+            logs_dir = config.base_directory / "logs"
+            logs_dir.mkdir(exist_ok=True)
+            
+            # Get current user
+            import getpass
+            current_user = getpass.getuser()
+            
+            # Create logrotate configuration
+            logrotate_config = logs_dir / "logrotate.conf"
+            logrotate_content = f"""
+{logs_dir}/*.log {{
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {current_user} {current_user}
+}}
+"""
+            
+            with open(logrotate_config, 'w') as f:
+                f.write(logrotate_content.strip())
+            
+            logger.info("Log rotation configured successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to setup log rotation: {e}")
+            raise InstallationError(f"Failed to setup log rotation: {e}")
+
+    async def _setup_backup_schedule(self, config: InstallationConfig) -> None:
+        """Set up backup schedule configuration."""
+        try:
+            logger.info("Setting up backup schedule...")
+            
+            # Create backup directory
+            backup_dir = config.base_directory / "backups"
+            backup_dir.mkdir(exist_ok=True)
+            
+            # Create backup script
+            backup_script = config.base_directory / "scripts" / "backup.sh"
+            backup_script.parent.mkdir(exist_ok=True)
+            
+            backup_content = f"""#!/bin/bash
+# Automated backup script for Multi-cluster Kafka Manager
+set -e
+
+BACKUP_DIR="{backup_dir}"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+BACKUP_NAME="kafka-cluster-backup_$TIMESTAMP"
+
+echo "Starting backup: $BACKUP_NAME"
+
+# Create backup directory
+mkdir -p "$BACKUP_DIR/$BACKUP_NAME"
+
+# Backup cluster registry
+cp -r "{config.base_directory}/cluster_registry" "$BACKUP_DIR/$BACKUP_NAME/"
+
+# Backup configuration
+cp -r "{config.base_directory}/config" "$BACKUP_DIR/$BACKUP_NAME/" 2>/dev/null || true
+
+# Create archive
+cd "$BACKUP_DIR"
+tar -czf "$BACKUP_NAME.tar.gz" "$BACKUP_NAME"
+rm -rf "$BACKUP_NAME"
+
+echo "Backup completed: $BACKUP_DIR/$BACKUP_NAME.tar.gz"
+
+# Clean up old backups (keep last 7 days)
+find "$BACKUP_DIR" -name "kafka-cluster-backup_*.tar.gz" -mtime +7 -delete 2>/dev/null || true
+"""
+            
+            with open(backup_script, 'w') as f:
+                f.write(backup_content.strip())
+            
+            # Make script executable
+            backup_script.chmod(0o755)
+            
+            logger.info("Backup schedule configured successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to setup backup schedule: {e}")
+            raise InstallationError(f"Failed to setup backup schedule: {e}")
+
     async def _setup_monitoring(self, config: InstallationConfig) -> None:
         """Set up monitoring configuration."""
         try:
@@ -1605,6 +1714,50 @@ fi
             
         except Exception as e:
             raise InstallationError(f"Failed to create startup scripts: {e}")
+
+    async def _set_permissions(self, config: InstallationConfig) -> None:
+        """Set appropriate file permissions."""
+        try:
+            logger.info("Setting file permissions...")
+            
+            # Set permissions for directories
+            directories_to_secure = [
+                config.base_directory,
+                config.data_directory,
+                config.config_directory,
+                config.base_directory / "logs",
+                config.base_directory / "backups",
+                config.base_directory / "scripts"
+            ]
+            
+            for directory in directories_to_secure:
+                if directory.exists():
+                    directory.chmod(0o755)
+                    logger.debug(f"Set directory permissions for {directory}")
+            
+            # Set permissions for scripts
+            scripts_dir = config.base_directory / "scripts"
+            if scripts_dir.exists():
+                for script_file in scripts_dir.glob("*.sh"):
+                    script_file.chmod(0o755)
+                    logger.debug(f"Set executable permissions for {script_file}")
+            
+            # Set permissions for configuration files (more restrictive)
+            config_files = [
+                config.config_directory / "multi_cluster.yml",
+                config.base_directory / "logs" / "logrotate.conf"
+            ]
+            
+            for config_file in config_files:
+                if config_file.exists():
+                    config_file.chmod(0o644)
+                    logger.debug(f"Set config file permissions for {config_file}")
+            
+            logger.info("File permissions set successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to set permissions: {e}")
+            raise InstallationError(f"Failed to set permissions: {e}")
     
     async def _generate_next_steps(self, config: InstallationConfig, clusters: List[str]) -> List[str]:
         """Generate next steps for user."""
