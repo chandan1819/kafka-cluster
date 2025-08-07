@@ -340,3 +340,18 @@ class RecoveryError(MultiClusterError):
             context={"failed_recovery_action": recovery_action.value},
             **kwargs
         )
+
+
+class InstallationError(MultiClusterError):
+    """Error during installation operations."""
+    
+    def __init__(self, message: str, installation_step: Optional[str] = None, **kwargs):
+        super().__init__(
+            message=message,
+            error_code="INSTALLATION_FAILED",
+            severity=ErrorSeverity.HIGH,
+            category=ErrorCategory.CONFIGURATION,
+            recovery_actions=[RecoveryAction.MANUAL_INTERVENTION],
+            context={"installation_step": installation_step} if installation_step else {},
+            **kwargs
+        )

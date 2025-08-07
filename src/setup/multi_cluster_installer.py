@@ -24,6 +24,9 @@ from src.services.template_manager import TemplateManager
 from src.registry.cluster_registry import ClusterRegistry
 from src.storage.file_backend import FileStorageBackend
 from src.exceptions import InstallationError, ValidationError
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class InstallationType(Enum):
@@ -923,7 +926,7 @@ class MultiClusterInstaller:
             warnings = []
             
             # Initialize storage backend
-            storage_backend = FileStorageBackend(base_path=config.base_directory / "cluster_registry")
+            storage_backend = FileStorageBackend(storage_dir=str(config.base_directory / "cluster_registry"))
             components.append("storage_backend")
             
             # Initialize cluster registry
@@ -1019,7 +1022,7 @@ class MultiClusterInstaller:
             warnings = []
             
             # Initialize multi-cluster components
-            storage_backend = FileStorageBackend(base_path=config.base_directory / "cluster_registry")
+            storage_backend = FileStorageBackend(storage_dir=str(config.base_directory / "cluster_registry"))
             cluster_registry = ClusterRegistry(storage_backend)
             template_manager = TemplateManager(storage_backend)
             
@@ -1104,89 +1107,104 @@ class MultiClusterInstaller:
     async def _create_builtin_templates(self, template_manager: TemplateManager, config: InstallationConfig) -> None:
         """Create built-in cluster templates."""
         try:
-            # Development template
-            dev_template = ClusterTemplate(
-                id="development",
-                name="Development",
-                description="Lightweight development cluster with minimal resources",
-                category="development",
-                kafka_config={
-                    "heap_size": "512M",
-                    "log_retention_hours": 24,
-                    "num_partitions": 1,
-                    "default_replication_factor": 1
-                },
-                rest_proxy_config={
-                    "heap_size": "256M"
-                },
-                ui_config={
-                    "heap_size": "256M"
-                },
-                resource_requirements={
-                    "min_memory_mb": 1024,
-                    "min_disk_gb": 5,
-                    "recommended_memory_mb": 2048,
-                    "recommended_disk_gb": 10
-                }
-            )
+            # Check if templates are already loaded (they are loaded during template manager initialization)
+            existing_templates = await template_manager.list_templates()
+            existing_template_ids = {template.id for template in existing_templates}
             
-            await template_manager.create_template(dev_template)
+            templates_to_create = []
+            
+            # Development template
+            if "development" not in existing_template_ids:
+                dev_template = ClusterTemplate(
+                    id="development",
+                    name="Development",
+                    description="Lightweight development cluster with minimal resources",
+                    category="development",
+                    kafka_config={
+                        "heap_size": "512M",
+                        "log_retention_hours": 24,
+                        "num_partitions": 1,
+                        "default_replication_factor": 1
+                    },
+                    rest_proxy_config={
+                        "heap_size": "256M"
+                    },
+                    ui_config={
+                        "heap_size": "256M"
+                    },
+                    resource_requirements={
+                        "min_memory_mb": 1024,
+                        "min_disk_gb": 5,
+                        "recommended_memory_mb": 2048,
+                        "recommended_disk_gb": 10
+                    }
+                )
+                templates_to_create.append(dev_template)
             
             # Testing template
-            test_template = ClusterTemplate(
-                id="testing",
-                name="Testing",
-                description="Testing cluster with moderate resources and multiple partitions",
-                category="testing",
-                kafka_config={
-                    "heap_size": "1G",
-                    "log_retention_hours": 72,
-                    "num_partitions": 3,
-                    "default_replication_factor": 1
-                },
-                rest_proxy_config={
-                    "heap_size": "512M"
-                },
-                ui_config={
-                    "heap_size": "512M"
-                },
-                resource_requirements={
-                    "min_memory_mb": 2048,
-                    "min_disk_gb": 10,
-                    "recommended_memory_mb": 4096,
-                    "recommended_disk_gb": 20
-                }
-            )
-            
-            await template_manager.create_template(test_template)
+            if "testing" not in existing_template_ids:
+                test_template = ClusterTemplate(
+                    id="testing",
+                    name="Testing",
+                    description="Testing cluster with moderate resources and multiple partitions",
+                    category="testing",
+                    kafka_config={
+                        "heap_size": "1G",
+                        "log_retention_hours": 72,
+                        "num_partitions": 3,
+                        "default_replication_factor": 1
+                    },
+                    rest_proxy_config={
+                        "heap_size": "512M"
+                    },
+                    ui_config={
+                        "heap_size": "512M"
+                    },
+                    resource_requirements={
+                        "min_memory_mb": 2048,
+                        "min_disk_gb": 10,
+                        "recommended_memory_mb": 4096,
+                        "recommended_disk_gb": 20
+                    }
+                )
+                templates_to_create.append(test_template)
             
             # Production template
-            prod_template = ClusterTemplate(
-                id="production",
-                name="Production",
-                description="Production-ready cluster with high availability and monitoring",
-                category="production",
-                kafka_config={
-                    "heap_size": "2G",
-                    "log_retention_hours": 168,
-                    "num_partitions": 6,
-                    "default_replication_factor": 3
-                },
-                rest_proxy_config={
-                    "heap_size": "1G"
-                },
-                ui_config={
-                    "heap_size": "1G"
-                },
-                resource_requirements={
-                    "min_memory_mb": 4096,
-                    "min_disk_gb": 50,
-                    "recommended_memory_mb": 8192,
-                    "recommended_disk_gb": 100
-                }
-            )
+            if "production" not in existing_template_ids:
+                prod_template = ClusterTemplate(
+                    id="production",
+                    name="Production",
+                    description="Production-ready cluster with high availability and monitoring",
+                    category="production",
+                    kafka_config={
+                        "heap_size": "2G",
+                        "log_retention_hours": 168,
+                        "num_partitions": 6,
+                        "default_replication_factor": 3
+                    },
+                    rest_proxy_config={
+                        "heap_size": "1G"
+                    },
+                    ui_config={
+                        "heap_size": "1G"
+                    },
+                    resource_requirements={
+                        "min_memory_mb": 4096,
+                        "min_disk_gb": 50,
+                        "recommended_memory_mb": 8192,
+                        "recommended_disk_gb": 100
+                    }
+                )
+                templates_to_create.append(prod_template)
             
-            await template_manager.create_template(prod_template)
+            # Create only the templates that don't exist
+            for template in templates_to_create:
+                await template_manager.create_template(template)
+            
+            if not templates_to_create:
+                logger.info("All built-in templates already exist, skipping creation")
+            else:
+                logger.info(f"Created {len(templates_to_create)} built-in templates")
             
         except Exception as e:
             raise InstallationError(f"Failed to create built-in templates: {e}")

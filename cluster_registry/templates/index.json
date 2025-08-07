@@ -1,0 +1,9 @@
+{
+  "templates": [
+    "development",
+    "testing",
+    "production",
+    "high-throughput"
+  ],
+  "last_updated": "2025-08-07T13:43:27.323438"
+}

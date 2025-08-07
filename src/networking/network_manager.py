@@ -401,6 +401,25 @@ class NetworkManager:
                 "error": str(e)
             }
     
+    async def network_exists(self, cluster_id: str) -> bool:
+        """Check if network exists for cluster.
+        
+        Args:
+            cluster_id: ID of cluster to check
+            
+        Returns:
+            True if network exists, False otherwise
+        """
+        try:
+            network_name = self._created_networks.get(cluster_id)
+            if not network_name:
+                network_name = f"{self.network_prefix}-{cluster_id}"
+            
+            return await self._network_exists(network_name)
+        except Exception as e:
+            logger.error(f"Failed to check network existence for cluster '{cluster_id}': {e}")
+            return False
+
     async def validate_network_isolation(self, cluster_id: str) -> Dict[str, Any]:
         """Validate network isolation for a cluster.
         

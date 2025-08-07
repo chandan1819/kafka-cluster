@@ -1,0 +1,48 @@
+{
+  "id": "testing",
+  "name": "Testing",
+  "description": "Balanced template for testing scenarios with moderate resource usage",
+  "category": "testing",
+  "default_kafka_config": {
+    "heap_size": "1G",
+    "log_retention_hours": 72,
+    "log_segment_bytes": 1073741824,
+    "num_partitions": 3,
+    "default_replication_factor": 1,
+    "num_network_threads": 3,
+    "num_io_threads": 6,
+    "socket_send_buffer_bytes": 102400,
+    "socket_receive_buffer_bytes": 102400,
+    "custom_properties": {}
+  },
+  "default_rest_proxy_config": {
+    "heap_size": "512M",
+    "consumer_request_timeout_ms": 30000,
+    "producer_request_timeout_ms": 30000,
+    "custom_properties": {}
+  },
+  "default_ui_config": {
+    "heap_size": "512M",
+    "readonly_mode": false,
+    "topic_creation_enabled": true,
+    "topic_deletion_enabled": true,
+    "clusters_config": {}
+  },
+  "default_retention_policy": {
+    "log_retention_hours": 72,
+    "log_retention_bytes": null,
+    "cleanup_policy": "delete"
+  },
+  "min_memory_mb": 2048,
+  "min_disk_gb": 5,
+  "recommended_memory_mb": 4096,
+  "recommended_disk_gb": 10,
+  "version": "1.0.0",
+  "created_at": "2025-08-07 13:43:27.319913",
+  "is_builtin": true,
+  "tags": [
+    "testing",
+    "balanced",
+    "ci-cd"
+  ]
+}

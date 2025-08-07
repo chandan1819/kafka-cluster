@@ -1,0 +1,41 @@
+[
+  {
+    "success": false,
+    "installation_type": "fresh_install",
+    "deployment_scenario": "development",
+    "installed_components": [],
+    "created_clusters": [],
+    "configuration_files": [],
+    "start_time": "2025-08-07T19:12:23.971110",
+    "end_time": "2025-08-07T19:12:24.234516",
+    "error_message": "Fresh installation failed: __init__() got an unexpected keyword argument 'base_path'",
+    "warnings": [],
+    "next_steps": []
+  },
+  {
+    "success": false,
+    "installation_type": "fresh_install",
+    "deployment_scenario": "development",
+    "installed_components": [],
+    "created_clusters": [],
+    "configuration_files": [],
+    "start_time": "2025-08-07T19:13:27.231436",
+    "end_time": "2025-08-07T19:13:27.323736",
+    "error_message": "Fresh installation failed: Failed to create built-in templates: Template 'development' already exists",
+    "warnings": [],
+    "next_steps": []
+  },
+  {
+    "success": false,
+    "installation_type": "fresh_install",
+    "deployment_scenario": "development",
+    "installed_components": [],
+    "created_clusters": [],
+    "configuration_files": [],
+    "start_time": "2025-08-07T19:15:38.617197",
+    "end_time": "2025-08-07T19:15:38.721170",
+    "error_message": "Fresh installation failed: Failed to create default clusters: Failed to register cluster 'dev-cluster': REGISTERED",
+    "warnings": [],
+    "next_steps": []
+  }
+]
