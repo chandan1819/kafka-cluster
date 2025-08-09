@@ -1,6 +1,6 @@
 #!/bin/bash
 # Multi-cluster Kafka Manager Stop Script
-# Generated on 2025-08-07T19:32:36.288621
+# Generated on 2025-08-09T10:56:17.751157
 
 set -e
 

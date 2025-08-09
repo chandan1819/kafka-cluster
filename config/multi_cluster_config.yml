@@ -8,7 +8,7 @@ directories:
   config: /Users/aadityasinha/code/kafka-cluster/config
   data: /Users/aadityasinha/code/kafka-cluster/data
 installation:
-  installed_at: '2025-08-07T19:32:36.287472'
+  installed_at: '2025-08-09T10:56:17.749237'
   scenario: development
   type: fresh_install
   version: '1.0'
@@ -19,7 +19,7 @@ multi_cluster:
     end: 9999
     start: 9000
 resources:
-  auto_cleanup_enabled: true
+  auto_cleanup_enabled: false
   max_disk_gb: 50
   max_memory_mb: 4096
   monitoring_enabled: false

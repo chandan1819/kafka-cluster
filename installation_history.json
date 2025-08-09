@@ -6,32 +6,6 @@
     "installed_components": [],
     "created_clusters": [],
     "configuration_files": [],
-    "start_time": "2025-08-07T19:17:57.420744",
-    "end_time": "2025-08-07T19:17:57.635760",
-    "error_message": "Fresh installation failed: Failed to create default clusters: Failed to register cluster 'dev-cluster': REGISTERED",
-    "warnings": [],
-    "next_steps": []
-  },
-  {
-    "success": false,
-    "installation_type": "fresh_install",
-    "deployment_scenario": "development",
-    "installed_components": [],
-    "created_clusters": [],
-    "configuration_files": [],
-    "start_time": "2025-08-07T19:18:55.611305",
-    "end_time": "2025-08-07T19:18:55.672172",
-    "error_message": "Fresh installation failed: Failed to create default clusters: Failed to register cluster 'dev-cluster': REGISTERED",
-    "warnings": [],
-    "next_steps": []
-  },
-  {
-    "success": false,
-    "installation_type": "fresh_install",
-    "deployment_scenario": "development",
-    "installed_components": [],
-    "created_clusters": [],
-    "configuration_files": [],
     "start_time": "2025-08-07T19:19:35.597998",
     "end_time": "2025-08-07T19:19:35.657027",
     "error_message": "Fresh installation failed: Failed to create default clusters: Failed to register cluster 'dev-cluster': REGISTERED",
@@ -133,6 +107,47 @@
     ],
     "start_time": "2025-08-07T19:32:36.250906",
     "end_time": "2025-08-07T19:32:36.289269",
+    "error_message": null,
+    "warnings": [],
+    "next_steps": [
+      "Review the generated configuration files",
+      "Start the services using: ./start.sh",
+      "Create topics and start developing with Kafka",
+      "Use the REST API at http://localhost:8082",
+      "Read the documentation for advanced configuration options",
+      "Join the community for support and updates"
+    ]
+  },
+  {
+    "success": false,
+    "installation_type": "fresh_install",
+    "deployment_scenario": "testing",
+    "installed_components": [],
+    "created_clusters": [],
+    "configuration_files": [],
+    "start_time": "2025-08-09T10:45:40.027938",
+    "end_time": "2025-08-09T10:46:58.923776",
+    "error_message": "Fresh installation failed: Failed to create default clusters: 1 validation error for ClusterDefinition\nenvironment\n  Input should be 'development', 'testing', 'staging' or 'production' [type=enum, input_value='dev', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.11/v/enum",
+    "warnings": [],
+    "next_steps": []
+  },
+  {
+    "success": true,
+    "installation_type": "fresh_install",
+    "deployment_scenario": "development",
+    "installed_components": [
+      "storage_backend",
+      "cluster_registry",
+      "template_manager",
+      "builtin_templates"
+    ],
+    "created_clusters": [],
+    "configuration_files": [
+      "/Users/aadityasinha/code/kafka-cluster/config/multi_cluster_config.yml",
+      "/Users/aadityasinha/code/kafka-cluster/.env"
+    ],
+    "start_time": "2025-08-09T10:54:59.303491",
+    "end_time": "2025-08-09T10:56:17.752115",
     "error_message": null,
     "warnings": [],
     "next_steps": [

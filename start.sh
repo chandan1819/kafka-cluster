@@ -1,6 +1,6 @@
 #!/bin/bash
 # Multi-cluster Kafka Manager Start Script
-# Generated on 2025-08-07T19:32:36.288548
+# Generated on 2025-08-09T10:56:17.750962
 
 set -e
 
